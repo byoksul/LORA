@@ -10,10 +10,12 @@ public record GetDashboardQuery : IRequest<ApiResponse<DashboardDto>>;
 public class GetDashboardQueryHandler : IRequestHandler<GetDashboardQuery, ApiResponse<DashboardDto>>
 {
     private readonly IOrderRepository _orderRepository;
+    private readonly IStockAnalyticsService _stockAnalytics;
 
-    public GetDashboardQueryHandler(IOrderRepository orderRepository)
+    public GetDashboardQueryHandler(IOrderRepository orderRepository, IStockAnalyticsService stockAnalytics)
     {
         _orderRepository = orderRepository;
+        _stockAnalytics = stockAnalytics;
     }
 
     public async Task<ApiResponse<DashboardDto>> Handle(GetDashboardQuery request, CancellationToken cancellationToken)
@@ -56,9 +58,11 @@ public class GetDashboardQueryHandler : IRequestHandler<GetDashboardQuery, ApiRe
             payments.Where(p => p.PaymentType == PaymentType.Complimentary).Sum(p => p.Amount)
         );
 
+        var stockSummary = await _stockAnalytics.GetDashboardAsync(cancellationToken);
+
         var dashboard = new DashboardDto(
             dailyRevenue, weeklyRevenue, monthlyRevenue, orderCount, averageBasket,
-            topProducts, lowProducts, hourlyTraffic, paymentDistribution);
+            topProducts, lowProducts, hourlyTraffic, paymentDistribution, stockSummary);
 
         return new ApiResponse<DashboardDto>(true, dashboard);
     }

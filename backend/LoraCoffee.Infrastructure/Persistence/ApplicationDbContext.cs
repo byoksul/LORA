@@ -16,6 +16,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<StockItem> StockItems => Set<StockItem>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<ProductRecipe> ProductRecipes => Set<ProductRecipe>();
+    public DbSet<ProductRecipeItem> ProductRecipeItems => Set<ProductRecipeItem>();
+    public DbSet<PurchaseReceipt> PurchaseReceipts => Set<PurchaseReceipt>();
     public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
@@ -44,11 +47,14 @@ public class ApplicationDbContext : DbContext
         {
             e.Property(p => p.Name).HasMaxLength(200);
             e.Property(p => p.Price).HasPrecision(18, 2);
+            e.Property(p => p.PriceLarge).HasPrecision(18, 2);
             e.HasOne(p => p.Category).WithMany(c => c.Products).HasForeignKey(p => p.CategoryId);
         });
 
         modelBuilder.Entity<Order>(e =>
         {
+            e.Property(o => o.SubtotalAmount).HasPrecision(18, 2);
+            e.Property(o => o.DiscountAmount).HasPrecision(18, 2);
             e.Property(o => o.TotalAmount).HasPrecision(18, 2);
             e.HasIndex(o => o.OrderNumber).IsUnique();
             e.HasOne(o => o.Cashier).WithMany(u => u.Orders).HasForeignKey(o => o.CashierId);
@@ -77,7 +83,34 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<StockMovement>(e =>
         {
             e.Property(m => m.Quantity).HasPrecision(18, 2);
+            e.Property(m => m.PreviousQuantity).HasPrecision(18, 2);
+            e.Property(m => m.NewQuantity).HasPrecision(18, 2);
             e.HasOne(m => m.StockItem).WithMany(s => s.Movements).HasForeignKey(m => m.StockItemId);
+            e.HasIndex(m => new { m.ReferenceType, m.ReferenceId });
+        });
+
+        modelBuilder.Entity<ProductRecipe>(e =>
+        {
+            e.Property(r => r.Name).HasMaxLength(200);
+            e.HasOne(r => r.Product).WithMany(p => p.Recipes).HasForeignKey(r => r.ProductId);
+            e.HasIndex(r => r.ProductId);
+        });
+
+        modelBuilder.Entity<ProductRecipeItem>(e =>
+        {
+            e.Property(i => i.Quantity).HasPrecision(18, 2);
+            e.Property(i => i.Unit).HasMaxLength(50);
+            e.HasOne(i => i.ProductRecipe).WithMany(r => r.Items).HasForeignKey(i => i.ProductRecipeId);
+            e.HasOne(i => i.StockItem).WithMany().HasForeignKey(i => i.StockItemId);
+        });
+
+        modelBuilder.Entity<PurchaseReceipt>(e =>
+        {
+            e.Property(p => p.UnitCost).HasPrecision(18, 2);
+            e.Property(p => p.TotalCost).HasPrecision(18, 2);
+            e.Property(p => p.SupplierName).HasMaxLength(200);
+            e.Property(p => p.InvoiceNumber).HasMaxLength(100);
+            e.HasOne(p => p.StockMovement).WithOne(m => m.PurchaseReceipt).HasForeignKey<PurchaseReceipt>(p => p.StockMovementId);
         });
 
         modelBuilder.Entity<OrderStatusHistory>(e =>

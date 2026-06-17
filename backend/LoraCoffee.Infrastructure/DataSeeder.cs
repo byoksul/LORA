@@ -11,20 +11,6 @@ namespace LoraCoffee.Infrastructure;
 
 public static class DataSeeder
 {
-  private static readonly Dictionary<string, string> ProductImageUrls = new()
-  {
-    ["Espresso"] = "https://images.unsplash.com/photo-1775512825412-6a94a01b99ef?w=800&h=800&fit=crop&auto=format&q=85",
-    ["Americano"] = "https://images.unsplash.com/photo-1551030173-122aabc4489c?w=800&h=800&fit=crop&auto=format&q=85",
-    ["Latte"] = "https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=800&h=800&fit=crop&auto=format&q=85",
-    ["Cappuccino"] = "https://images.unsplash.com/photo-1572442388796-11668a67e53d?w=800&h=800&fit=crop&auto=format&q=85",
-    ["Ice Latte"] = "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=800&h=800&fit=crop&auto=format&q=85",
-    ["Ice Americano"] = "https://images.unsplash.com/photo-1621221814951-fa755dd0c993?w=800&h=800&fit=crop&auto=format&q=85",
-    ["San Sebastian"] = "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&h=800&fit=crop&auto=format&q=85",
-    ["Tiramisu"] = "https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=800&h=800&fit=crop&auto=format&q=85",
-    ["Su"] = "https://images.unsplash.com/photo-1628035280603-74ca33b17259?w=800&h=800&fit=crop&auto=format&q=85",
-    ["Limonata"] = "https://images.unsplash.com/photo-1631308492942-3a713d7fd02e?w=800&h=800&fit=crop&auto=format&q=85",
-  };
-
   private static readonly Dictionary<string, (string Username, string Pin)> DemoCredentials = new()
   {
     ["admin@loracoffee.com"] = ("admin", "123456"),
@@ -41,7 +27,8 @@ public static class DataSeeder
     var environment = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
 
     await context.Database.MigrateAsync();
-    await UpdateProductImagesAsync(context);
+    await SyncMenuAsync(context);
+    await SyncStockAndRecipesAsync(context);
 
     if (environment.IsDevelopment())
       await EnsureDemoCredentialsAsync(context, passwordHasher);
@@ -94,63 +81,243 @@ public static class DataSeeder
 
     context.Users.AddRange(superAdmin, manager, cashier, barista);
 
-    var categories = new List<Category>
-    {
-      new() { Name = "Kahveler", SortOrder = 1, IsActive = true },
-      new() { Name = "Soğuk Kahveler", SortOrder = 2, IsActive = true },
-      new() { Name = "Tatlılar", SortOrder = 3, IsActive = true },
-      new() { Name = "İçecekler", SortOrder = 4, IsActive = true }
-    };
-    context.Categories.AddRange(categories);
-    await context.SaveChangesAsync();
-
-    var products = ProductImageUrls.Select(kvp => new Product
-    {
-      Name = kvp.Key,
-      Description = GetProductDescription(kvp.Key),
-      Price = GetProductPrice(kvp.Key),
-      CategoryId = GetCategoryId(kvp.Key, categories),
-      ImageUrl = kvp.Value,
-      IsActive = true
-    }).ToList();
-
-    context.Products.AddRange(products);
-
     var stockItems = new List<StockItem>
     {
-      new() { Name = "Kahve", Unit = "kg", CurrentQuantity = 15, CriticalLevel = 5 },
+      new() { Name = "Kahve çekirdeği", Unit = "kg", CurrentQuantity = 15, CriticalLevel = 5 },
       new() { Name = "Süt", Unit = "lt", CurrentQuantity = 20, CriticalLevel = 10 },
       new() { Name = "Bardak", Unit = "adet", CurrentQuantity = 500, CriticalLevel = 100 },
       new() { Name = "Kapak", Unit = "adet", CurrentQuantity = 400, CriticalLevel = 100 },
+      new() { Name = "Buz", Unit = "kg", CurrentQuantity = 50, CriticalLevel = 10 },
       new() { Name = "Şurup", Unit = "lt", CurrentQuantity = 8, CriticalLevel = 3 },
-      new() { Name = "Tatlılar", Unit = "adet", CurrentQuantity = 30, CriticalLevel = 10 }
+      new() { Name = "Kakao", Unit = "kg", CurrentQuantity = 5, CriticalLevel = 2 },
+      new() { Name = "Çikolata sosu", Unit = "lt", CurrentQuantity = 6, CriticalLevel = 2 },
+      new() { Name = "Tatlı", Unit = "adet", CurrentQuantity = 30, CriticalLevel = 10 }
     };
     context.StockItems.AddRange(stockItems);
 
     await context.SaveChangesAsync();
   }
 
-  private static async Task UpdateProductImagesAsync(ApplicationDbContext context)
+  private static async Task SyncMenuAsync(ApplicationDbContext context)
   {
-    var products = await context.Products.ToListAsync();
-    foreach (var product in products)
+    var catalogNames = MenuCatalog.AllProductNames();
+    var changed = false;
+
+    foreach (var catalogCategory in MenuCatalog.Categories)
     {
-      if (!ProductImageUrls.TryGetValue(product.Name, out var url)) continue;
+      var category = await context.Categories
+        .FirstOrDefaultAsync(c => c.Name == catalogCategory.Name);
 
-      var needsUpdate = string.IsNullOrWhiteSpace(product.ImageUrl)
-        || product.ImageUrl != url
-        || product.ImageUrl.Contains("c7c8b0c8c8c8")
-        || product.ImageUrl.Contains("w=400");
-
-      if (needsUpdate)
+      if (category is null)
       {
-        product.ImageUrl = url;
-        product.UpdatedDate = DateTime.UtcNow;
+        category = new Category
+        {
+          Name = catalogCategory.Name,
+          SortOrder = catalogCategory.SortOrder,
+          IsActive = true
+        };
+        context.Categories.Add(category);
+        await context.SaveChangesAsync();
+      }
+      else if (category.SortOrder != catalogCategory.SortOrder || !category.IsActive)
+      {
+        category.SortOrder = catalogCategory.SortOrder;
+        category.IsActive = true;
+        category.UpdatedDate = DateTime.UtcNow;
+        changed = true;
+      }
+
+      foreach (var catalogProduct in catalogCategory.Products)
+      {
+        var product = await context.Products
+          .FirstOrDefaultAsync(p => p.Name == catalogProduct.Name);
+
+        var imageUrl = MenuProductImages.Get(catalogProduct.Name);
+
+        if (product is null)
+        {
+          context.Products.Add(new Product
+          {
+            Name = catalogProduct.Name,
+            Description = catalogProduct.Description,
+            Price = catalogProduct.Price,
+            PriceLarge = catalogProduct.PriceLarge,
+            SupportsMilkChoice = catalogProduct.SupportsMilkChoice,
+            CategoryId = category.Id,
+            ImageUrl = imageUrl,
+            IsActive = true
+          });
+          changed = true;
+          continue;
+        }
+
+        var needsUpdate =
+          product.CategoryId != category.Id ||
+          product.Price != catalogProduct.Price ||
+          product.PriceLarge != catalogProduct.PriceLarge ||
+          product.SupportsMilkChoice != catalogProduct.SupportsMilkChoice ||
+          product.Description != catalogProduct.Description ||
+          product.ImageUrl != imageUrl ||
+          !product.IsActive;
+
+        if (needsUpdate)
+        {
+          product.CategoryId = category.Id;
+          product.Price = catalogProduct.Price;
+          product.PriceLarge = catalogProduct.PriceLarge;
+          product.SupportsMilkChoice = catalogProduct.SupportsMilkChoice;
+          product.Description = catalogProduct.Description;
+          product.ImageUrl = imageUrl;
+          product.IsActive = true;
+          product.UpdatedDate = DateTime.UtcNow;
+          changed = true;
+        }
       }
     }
 
-    if (products.Count > 0)
+    var allProducts = await context.Products.ToListAsync();
+
+    foreach (var product in allProducts)
+    {
+      if (catalogNames.Contains(product.Name) || !product.IsActive) continue;
+
+      product.IsActive = false;
+      product.UpdatedDate = DateTime.UtcNow;
+      changed = true;
+    }
+
+    var catalogCategoryNames = MenuCatalog.Categories.Select(x => x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+    var allCategories = await context.Categories.ToListAsync();
+
+    foreach (var category in allCategories)
+    {
+      if (catalogCategoryNames.Contains(category.Name) || !category.IsActive) continue;
+
+      category.IsActive = false;
+      category.UpdatedDate = DateTime.UtcNow;
+      changed = true;
+    }
+
+    if (changed)
       await context.SaveChangesAsync();
+  }
+
+  private static async Task SyncStockAndRecipesAsync(ApplicationDbContext context)
+  {
+    var stockDefs = new (string Name, string Unit, decimal Qty, decimal Critical)[]
+    {
+      ("Kahve çekirdeği", "kg", 15, 5),
+      ("Süt", "lt", 20, 10),
+      ("Bardak", "adet", 500, 100),
+      ("Kapak", "adet", 400, 100),
+      ("Buz", "kg", 50, 10),
+      ("Şurup", "lt", 8, 3),
+      ("Kakao", "kg", 5, 2),
+      ("Çikolata sosu", "lt", 6, 2),
+      ("Tatlı", "adet", 30, 10),
+    };
+
+    foreach (var def in stockDefs)
+    {
+      var item = await context.StockItems.FirstOrDefaultAsync(s => s.Name == def.Name);
+      if (item is null)
+      {
+        context.StockItems.Add(new StockItem
+        {
+          Name = def.Name,
+          Unit = def.Unit,
+          CurrentQuantity = def.Qty,
+          CriticalLevel = def.Critical,
+          IsActive = true
+        });
+      }
+    }
+
+    await context.SaveChangesAsync();
+
+    var stockMap = await context.StockItems.ToDictionaryAsync(s => s.Name, s => s.Id);
+
+    var recipeDefs = new Dictionary<string, (string Name, (string Stock, decimal Qty, string Unit, bool Optional)[] Items)>
+    {
+      ["Espresso"] = ("Espresso Reçetesi", [
+        ("Kahve çekirdeği", 0.018m, "kg", false),
+        ("Bardak", 1m, "adet", false),
+        ("Kapak", 1m, "adet", false),
+      ]),
+      ["Americano"] = ("Americano Reçetesi", [
+        ("Kahve çekirdeği", 0.018m, "kg", false),
+        ("Bardak", 1m, "adet", false),
+        ("Kapak", 1m, "adet", false),
+      ]),
+      ["Latte"] = ("Latte Reçetesi", [
+        ("Kahve çekirdeği", 0.018m, "kg", false),
+        ("Süt", 0.200m, "lt", false),
+        ("Bardak", 1m, "adet", false),
+        ("Kapak", 1m, "adet", false),
+      ]),
+      ["Ice Latte"] = ("Ice Latte Reçetesi", [
+        ("Kahve çekirdeği", 0.018m, "kg", false),
+        ("Süt", 0.250m, "lt", false),
+        ("Bardak", 1m, "adet", false),
+        ("Kapak", 1m, "adet", false),
+        ("Buz", 0.150m, "kg", false),
+      ]),
+      ["Cappuccino"] = ("Cappuccino Reçetesi", [
+        ("Kahve çekirdeği", 0.018m, "kg", false),
+        ("Süt", 0.180m, "lt", false),
+        ("Bardak", 1m, "adet", false),
+        ("Kapak", 1m, "adet", false),
+      ]),
+      ["Mocha"] = ("Mocha Reçetesi", [
+        ("Kahve çekirdeği", 0.018m, "kg", false),
+        ("Süt", 0.200m, "lt", false),
+        ("Kakao", 0.010m, "kg", false),
+        ("Çikolata sosu", 0.020m, "lt", false),
+        ("Bardak", 1m, "adet", false),
+        ("Kapak", 1m, "adet", false),
+      ]),
+    };
+
+    foreach (var (productName, recipeDef) in recipeDefs)
+    {
+      var product = await context.Products.FirstOrDefaultAsync(p => p.Name == productName);
+      if (product is null) continue;
+
+      product.TrackStock = true;
+      product.UpdatedDate = DateTime.UtcNow;
+
+      var recipe = await context.ProductRecipes
+        .Include(r => r.Items)
+        .FirstOrDefaultAsync(r => r.ProductId == product.Id);
+
+      if (recipe is null)
+      {
+        recipe = new ProductRecipe
+        {
+          ProductId = product.Id,
+          Name = recipeDef.Name,
+          IsActive = true
+        };
+        context.ProductRecipes.Add(recipe);
+      }
+
+      if (recipe.Items.Count == 0)
+      {
+        foreach (var item in recipeDef.Items)
+        {
+          if (!stockMap.TryGetValue(item.Stock, out var stockId)) continue;
+          recipe.Items.Add(new ProductRecipeItem
+          {
+            StockItemId = stockId,
+            Quantity = item.Qty,
+            Unit = item.Unit,
+            IsOptional = item.Optional
+          });
+        }
+      }
+    }
+
+    await context.SaveChangesAsync();
   }
 
   private static async Task EnsureDemoCredentialsAsync(ApplicationDbContext context, IPasswordHasher passwordHasher)
@@ -180,41 +347,5 @@ public static class DataSeeder
 
     if (changed)
       await context.SaveChangesAsync();
-  }
-
-  private static string GetProductDescription(string name) => new Dictionary<string, string>
-  {
-    ["Espresso"] = "Yoğun ve aromatik tek shot espresso",
-    ["Americano"] = "Espresso ve sıcak su",
-    ["Latte"] = "Espresso ve kremsi süt",
-    ["Cappuccino"] = "Espresso, süt ve süt köpüğü",
-    ["Ice Latte"] = "Soğuk latte, buzlu",
-    ["Ice Americano"] = "Soğuk americano",
-    ["San Sebastian"] = "Kremalı cheesecake",
-    ["Tiramisu"] = "İtalyan tiramisu",
-    ["Su"] = "500ml su",
-    ["Limonata"] = "Taze sıkılmış limonata",
-  }.GetValueOrDefault(name, "");
-
-  private static decimal GetProductPrice(string name) => new Dictionary<string, decimal>
-  {
-    ["Espresso"] = 85,
-    ["Americano"] = 95,
-    ["Latte"] = 110,
-    ["Cappuccino"] = 110,
-    ["Ice Latte"] = 120,
-    ["Ice Americano"] = 105,
-    ["San Sebastian"] = 145,
-    ["Tiramisu"] = 135,
-    ["Su"] = 25,
-    ["Limonata"] = 75,
-  }.GetValueOrDefault(name, 0);
-
-  private static Guid GetCategoryId(string name, List<Category> categories)
-  {
-    if (name is "Ice Latte" or "Ice Americano") return categories[1].Id;
-    if (name is "San Sebastian" or "Tiramisu") return categories[2].Id;
-    if (name is "Su" or "Limonata") return categories[3].Id;
-    return categories[0].Id;
   }
 }

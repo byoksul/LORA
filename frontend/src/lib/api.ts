@@ -91,9 +91,37 @@ export const api = {
     }),
 
   getDashboard: () => request<import('@/types').Dashboard>('/api/dashboard'),
-  getStockItems: () => request<import('@/types').StockItem[]>('/api/stock'),
+  getStockItems: () => request<import('@/types').StockItem[]>('/api/stock-items'),
+  getStockMovements: (params?: Record<string, string>) => {
+    const qs = params ? `?${new URLSearchParams(params).toString()}` : ''
+    return request<import('@/types').StockMovement[]>(`/api/stock/movements${qs}`)
+  },
+  getStockAlerts: () => request<import('@/types').StockAlert[]>('/api/stock/alerts'),
+  getStockForecast: () => request<import('@/types').StockForecast[]>('/api/stock/forecast'),
+  getStockDashboard: () => request<import('@/types').StockDashboard>('/api/stock/dashboard'),
+  createStockItem: (data: unknown) =>
+    request<import('@/types').StockItem>('/api/stock-items', { method: 'POST', body: JSON.stringify(data) }),
+  updateStockItem: (id: string, data: unknown) =>
+    request<import('@/types').StockItem>(`/api/stock-items/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  stockManualIn: (id: string, data: unknown) =>
+    request<import('@/types').StockMovement>(`/api/stock-items/${id}/manual-in`, { method: 'POST', body: JSON.stringify(data) }),
+  stockManualOut: (id: string, data: unknown) =>
+    request<import('@/types').StockMovement>(`/api/stock-items/${id}/manual-out`, { method: 'POST', body: JSON.stringify(data) }),
+  stockWaste: (id: string, data: unknown) =>
+    request<import('@/types').StockMovement>(`/api/stock-items/${id}/waste`, { method: 'POST', body: JSON.stringify(data) }),
+  stockAdjustment: (id: string, data: unknown) =>
+    request<import('@/types').StockMovement>(`/api/stock-items/${id}/adjustment`, { method: 'POST', body: JSON.stringify(data) }),
+  stockPurchase: (id: string, data: unknown) =>
+    request<import('@/types').StockMovement>(`/api/stock-items/${id}/purchase`, { method: 'POST', body: JSON.stringify(data) }),
   createStockMovement: (data: unknown) =>
     request<unknown>('/api/stock/movements', { method: 'POST', body: JSON.stringify(data) }),
+
+  getProductRecipe: (productId: string) =>
+    request<import('@/types').ProductRecipe>(`/api/products/${productId}/recipe`),
+  upsertProductRecipe: (productId: string, data: unknown) =>
+    request<import('@/types').ProductRecipe>(`/api/products/${productId}/recipe`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteRecipeItem: (productId: string, itemId: string) =>
+    request<import('@/types').ProductRecipe>(`/api/products/${productId}/recipe/items/${itemId}`, { method: 'DELETE' }),
 
   getUsers: () => request<import('@/types').User[]>('/api/users'),
   createUser: (data: unknown) =>

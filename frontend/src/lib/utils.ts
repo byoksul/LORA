@@ -28,3 +28,47 @@ export function formatPrepDuration(createdDate: string, readyAt: string) {
   )
   return formatDurationSeconds(seconds)
 }
+
+export const DISCOUNT_PERCENT = 25
+
+/** Fiziksel menüyle uyumlu: indirimli tutar 5 TL'ye yuvarlanır. */
+export function calculateDiscountedTotal(subtotal: number, hasDiscount: boolean) {
+  if (!hasDiscount || subtotal <= 0) return subtotal
+  const discounted = subtotal * (100 - DISCOUNT_PERCENT) / 100
+  return Math.round(discounted / 5) * 5
+}
+
+export function calculateDiscountAmount(subtotal: number, hasDiscount: boolean) {
+  if (!hasDiscount || subtotal <= 0) return 0
+  return subtotal - calculateDiscountedTotal(subtotal, hasDiscount)
+}
+
+export function getDiscountLabel(discountType: string) {
+  switch (discountType) {
+    case 'Student':
+      return 'Öğrenci'
+    case 'HealthcareWorker':
+      return 'Sağlık personeli'
+    default:
+      return ''
+  }
+}
+
+export function formatProductPrice(price: number, priceLarge?: number | null) {
+  if (priceLarge) return `${formatCurrency(price)} – ${formatCurrency(priceLarge)}`
+  return formatCurrency(price)
+}
+
+export function getMilkLabel(milkType?: string | null) {
+  if (milkType === 'LactoseFree') return 'Laktozsuz'
+  if (milkType === 'Regular') return 'Laktozlu'
+  return null
+}
+
+export function buildCartKey(productId: string, sizeLabel?: string | null, milkType?: string | null) {
+  return `${productId}|${sizeLabel ?? ''}|${milkType ?? ''}`
+}
+
+export function productNeedsOptions(product: { priceLarge?: number | null; supportsMilkChoice: boolean }) {
+  return !!product.priceLarge || product.supportsMilkChoice
+}

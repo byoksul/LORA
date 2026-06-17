@@ -1,58 +1,96 @@
 import { create } from 'zustand'
-import type { OrderItem, PaymentType } from '@/types'
+import { buildCartKey, calculateDiscountAmount, calculateDiscountedTotal } from '@/lib/utils'
+import type { DiscountType, MilkType, OrderItem, PaymentType, ProductSize } from '@/types'
 
-interface CartItem {
+export interface CartItem {
+  cartKey: string
   productId: string
   productName: string
   unitPrice: number
   quantity: number
   imageUrl?: string
+  sizeLabel?: ProductSize
+  milkType?: MilkType
+}
+
+interface AddItemOptions {
+  sizeLabel?: ProductSize
+  milkType?: MilkType
 }
 
 interface PosState {
   items: CartItem[]
   selectedCategoryId: string | null
-  addItem: (productId: string, productName: string, unitPrice: number, imageUrl?: string) => void
-  removeItem: (productId: string) => void
-  updateQuantity: (productId: string, quantity: number) => void
+  discountType: DiscountType
+  addItem: (
+    productId: string,
+    productName: string,
+    unitPrice: number,
+    imageUrl?: string,
+    options?: AddItemOptions
+  ) => void
+  removeItem: (cartKey: string) => void
+  updateQuantity: (cartKey: string, quantity: number) => void
   clearCart: () => void
   setSelectedCategory: (id: string | null) => void
+  setDiscountType: (type: DiscountType) => void
+  getSubtotal: () => number
+  getDiscountAmount: () => number
   getTotal: () => number
 }
 
 export const usePosStore = create<PosState>((set, get) => ({
   items: [],
   selectedCategoryId: null,
-  addItem: (productId, productName, unitPrice, imageUrl) => {
+  discountType: 'None',
+  addItem: (productId, productName, unitPrice, imageUrl, options) => {
+    const sizeLabel = options?.sizeLabel
+    const milkType = options?.milkType
+    const cartKey = buildCartKey(productId, sizeLabel, milkType)
     const items = get().items
-    const existing = items.find((i) => i.productId === productId)
+    const existing = items.find((i) => i.cartKey === cartKey)
+
     if (existing) {
       set({
         items: items.map((i) =>
-          i.productId === productId
+          i.cartKey === cartKey
             ? { ...i, quantity: i.quantity + 1, imageUrl: i.imageUrl ?? imageUrl }
             : i
         ),
       })
     } else {
       set({
-        items: [...items, { productId, productName, unitPrice, quantity: 1, imageUrl }],
+        items: [
+          ...items,
+          { cartKey, productId, productName, unitPrice, quantity: 1, imageUrl, sizeLabel, milkType },
+        ],
       })
     }
   },
-  removeItem: (productId) => set({ items: get().items.filter((i) => i.productId !== productId) }),
-  updateQuantity: (productId, quantity) => {
+  removeItem: (cartKey) => set({ items: get().items.filter((i) => i.cartKey !== cartKey) }),
+  updateQuantity: (cartKey, quantity) => {
     if (quantity <= 0) {
-      get().removeItem(productId)
+      get().removeItem(cartKey)
       return
     }
     set({
-      items: get().items.map((i) => (i.productId === productId ? { ...i, quantity } : i)),
+      items: get().items.map((i) => (i.cartKey === cartKey ? { ...i, quantity } : i)),
     })
   },
-  clearCart: () => set({ items: [] }),
+  clearCart: () => set({ items: [], discountType: 'None' }),
   setSelectedCategory: (id) => set({ selectedCategoryId: id }),
-  getTotal: () => get().items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0),
+  setDiscountType: (type) => set({ discountType: type }),
+  getSubtotal: () => get().items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0),
+  getDiscountAmount: () => {
+    const { discountType } = get()
+    const hasDiscount = discountType === 'Student' || discountType === 'HealthcareWorker'
+    return calculateDiscountAmount(get().getSubtotal(), hasDiscount)
+  },
+  getTotal: () => {
+    const { discountType } = get()
+    const hasDiscount = discountType === 'Student' || discountType === 'HealthcareWorker'
+    return calculateDiscountedTotal(get().getSubtotal(), hasDiscount)
+  },
 }))
 
 const QUEUE_KEY = 'lora_offline_orders'
@@ -61,6 +99,7 @@ export interface OfflineOrder {
   items: OrderItem[]
   payments: { paymentType: PaymentType; amount: number }[]
   notes?: string
+  discountType?: DiscountType
   timestamp?: number
 }
 
@@ -93,9 +132,15 @@ export async function syncOfflineQueue() {
   for (let i = 0; i < queue.length; i++) {
     const order = queue[i]
     const result = await api.createOrder({
-      items: order.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+      items: order.items.map((i) => ({
+        productId: i.productId,
+        quantity: i.quantity,
+        sizeLabel: i.sizeLabel ?? undefined,
+        milkType: i.milkType ?? undefined,
+      })),
       payments: order.payments,
       notes: order.notes,
+      discountType: order.discountType ?? 'None',
     })
     if (result.success) synced.push(i)
   }

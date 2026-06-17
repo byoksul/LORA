@@ -7,6 +7,9 @@ public class Order : BaseEntity
 {
     public int OrderNumber { get; set; }
     public OrderStatus Status { get; set; } = OrderStatus.Pending;
+    public decimal SubtotalAmount { get; set; }
+    public DiscountType DiscountType { get; set; } = DiscountType.None;
+    public decimal DiscountAmount { get; set; }
     public decimal TotalAmount { get; set; }
     public string? Notes { get; set; }
     public bool IsSynced { get; set; } = true;

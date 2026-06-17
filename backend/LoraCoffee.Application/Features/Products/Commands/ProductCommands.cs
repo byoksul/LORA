@@ -37,8 +37,8 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new ApiResponse<ProductDto>(true, new ProductDto(
-            product.Id, product.Name, product.Description, product.Price, product.ImageUrl,
-            product.IsActive, product.TrackStock, product.CategoryId, ""));
+            product.Id, product.Name, product.Description, product.Price, product.PriceLarge, product.SupportsMilkChoice, product.ImageUrl,
+            product.IsActive, product.TrackStock, false, product.CategoryId, ""));
     }
 }
 
@@ -73,7 +73,7 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new ApiResponse<ProductDto>(true, new ProductDto(
-            product.Id, product.Name, product.Description, product.Price, product.ImageUrl,
-            product.IsActive, product.TrackStock, product.CategoryId, ""));
+            product.Id, product.Name, product.Description, product.Price, product.PriceLarge, product.SupportsMilkChoice, product.ImageUrl,
+            product.IsActive, product.TrackStock, false, product.CategoryId, ""));
     }
 }

@@ -8,6 +8,8 @@ using LoraCoffee.Application.Features.Orders.Commands;
 using LoraCoffee.Application.Features.Orders.Queries;
 using LoraCoffee.Application.Features.Products.Commands;
 using LoraCoffee.Application.Features.Products.Queries;
+using LoraCoffee.Application.Features.Recipes.Commands;
+using LoraCoffee.Application.Features.Recipes.Queries;
 using LoraCoffee.Application.Features.Reports.Queries;
 using LoraCoffee.Application.Features.Stock.Commands;
 using LoraCoffee.Application.Features.Stock.Queries;
@@ -109,6 +111,42 @@ public class ProductsController : ControllerBase
         if (!result.Success) return BadRequest(result);
         return Ok(result);
     }
+
+    [HttpGet("{productId}/recipe")]
+    [Authorize(Roles = "SuperAdmin,Manager")]
+    public async Task<ActionResult<ApiResponse<ProductRecipeDto>>> GetRecipe(Guid productId)
+    {
+        var result = await _mediator.Send(new GetProductRecipeQuery(productId));
+        if (!result.Success) return NotFound(result);
+        return Ok(result);
+    }
+
+    [HttpPost("{productId}/recipe")]
+    [Authorize(Roles = "SuperAdmin,Manager")]
+    public async Task<ActionResult<ApiResponse<ProductRecipeDto>>> CreateRecipe(Guid productId, [FromBody] UpsertProductRecipeRequest request)
+    {
+        var result = await _mediator.Send(new UpsertProductRecipeCommand(productId, request));
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
+    [HttpPut("{productId}/recipe")]
+    [Authorize(Roles = "SuperAdmin,Manager")]
+    public async Task<ActionResult<ApiResponse<ProductRecipeDto>>> UpdateRecipe(Guid productId, [FromBody] UpsertProductRecipeRequest request)
+    {
+        var result = await _mediator.Send(new UpsertProductRecipeCommand(productId, request));
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
+    [HttpDelete("{productId}/recipe/items/{itemId}")]
+    [Authorize(Roles = "SuperAdmin,Manager")]
+    public async Task<ActionResult<ApiResponse<ProductRecipeDto>>> DeleteRecipeItem(Guid productId, Guid itemId)
+    {
+        var result = await _mediator.Send(new DeleteProductRecipeItemCommand(productId, itemId));
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
 }
 
 [ApiController]
@@ -158,7 +196,93 @@ public class DashboardController : ControllerBase
 }
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/stock-items")]
+[Authorize(Roles = "SuperAdmin,Manager")]
+public class StockItemsController : ControllerBase
+{
+    private readonly IMediator _mediator;
+
+    public StockItemsController(IMediator mediator) => _mediator = mediator;
+
+    [HttpGet]
+    public async Task<ActionResult<ApiResponse<List<StockItemDto>>>> GetAll()
+        => Ok(await _mediator.Send(new GetStockItemsQuery()));
+
+    [HttpPost]
+    public async Task<ActionResult<ApiResponse<StockItemDto>>> Create([FromBody] CreateStockItemRequest request)
+    {
+        var result = await _mediator.Send(new CreateStockItemCommand(request));
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
+    [HttpPut("{id}")]
+    public async Task<ActionResult<ApiResponse<StockItemDto>>> Update(Guid id, [FromBody] UpdateStockItemRequest request)
+    {
+        var result = await _mediator.Send(new UpdateStockItemCommand(id, request));
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
+    [HttpGet("{id}/movements")]
+    public async Task<ActionResult<ApiResponse<List<StockMovementDto>>>> GetMovements(
+        Guid id,
+        [FromQuery] string? movementType,
+        [FromQuery] string? referenceType,
+        [FromQuery] Guid? createdBy,
+        [FromQuery] DateTime? startDate,
+        [FromQuery] DateTime? endDate)
+        => Ok(await _mediator.Send(new GetStockMovementsQuery(id, movementType, referenceType, createdBy, startDate, endDate)));
+
+    [HttpPost("{id}/manual-in")]
+    public async Task<ActionResult<ApiResponse<StockMovementDto>>> ManualIn(Guid id, [FromBody] ManualMovementRequest request)
+    {
+        var result = await _mediator.Send(new ManualInCommand(id, request, GetUserId()));
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
+    [HttpPost("{id}/manual-out")]
+    public async Task<ActionResult<ApiResponse<StockMovementDto>>> ManualOut(Guid id, [FromBody] ManualMovementRequest request)
+    {
+        var result = await _mediator.Send(new ManualOutCommand(id, request, GetUserId()));
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
+    [HttpPost("{id}/waste")]
+    public async Task<ActionResult<ApiResponse<StockMovementDto>>> Waste(Guid id, [FromBody] WasteEntryRequest request)
+    {
+        var result = await _mediator.Send(new WasteCommand(id, request, GetUserId()));
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
+    [HttpPost("{id}/adjustment")]
+    public async Task<ActionResult<ApiResponse<StockMovementDto>>> Adjustment(Guid id, [FromBody] AdjustmentRequest request)
+    {
+        var result = await _mediator.Send(new AdjustmentCommand(id, request, GetUserId()));
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
+    [HttpPost("{id}/purchase")]
+    public async Task<ActionResult<ApiResponse<StockMovementDto>>> Purchase(Guid id, [FromBody] PurchaseEntryRequest request)
+    {
+        var result = await _mediator.Send(new PurchaseInCommand(id, request, GetUserId()));
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
+    private Guid? GetUserId()
+    {
+        var id = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return id is not null ? Guid.Parse(id) : null;
+    }
+}
+
+[ApiController]
+[Route("api/stock")]
 [Authorize(Roles = "SuperAdmin,Manager")]
 public class StockController : ControllerBase
 {
@@ -167,8 +291,30 @@ public class StockController : ControllerBase
     public StockController(IMediator mediator) => _mediator = mediator;
 
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<List<StockItemDto> > >> GetAll()
+    public async Task<ActionResult<ApiResponse<List<StockItemDto>>>> GetAll()
         => Ok(await _mediator.Send(new GetStockItemsQuery()));
+
+    [HttpGet("movements")]
+    public async Task<ActionResult<ApiResponse<List<StockMovementDto>>>> GetMovements(
+        [FromQuery] Guid? stockItemId,
+        [FromQuery] string? movementType,
+        [FromQuery] string? referenceType,
+        [FromQuery] Guid? createdBy,
+        [FromQuery] DateTime? startDate,
+        [FromQuery] DateTime? endDate)
+        => Ok(await _mediator.Send(new GetStockMovementsQuery(stockItemId, movementType, referenceType, createdBy, startDate, endDate)));
+
+    [HttpGet("alerts")]
+    public async Task<ActionResult<ApiResponse<List<StockAlertDto>>>> GetAlerts()
+        => Ok(await _mediator.Send(new GetStockAlertsQuery()));
+
+    [HttpGet("forecast")]
+    public async Task<ActionResult<ApiResponse<List<StockForecastDto>>>> GetForecast()
+        => Ok(await _mediator.Send(new GetStockForecastQuery()));
+
+    [HttpGet("dashboard")]
+    public async Task<ActionResult<ApiResponse<StockDashboardDto>>> GetDashboard()
+        => Ok(await _mediator.Send(new GetStockDashboardQuery()));
 
     [HttpPost("movements")]
     public async Task<ActionResult<ApiResponse<StockMovementDto>>> CreateMovement([FromBody] CreateStockMovementRequest request)

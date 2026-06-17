@@ -1,0 +1,218 @@
+{
+  "Americano": {
+    "id": "photo-1559496417-e7f25cb247f3",
+    "alt": "americano"
+  },
+  "Banana Latte": {
+    "id": "photo-1623507318654-d4cca1c34b85",
+    "alt": "banana latte"
+  },
+  "Bazlama Sandviç": {
+    "id": "photo-1664192579000-fe65c5692d22",
+    "alt": "sandwich"
+  },
+  "Bella Vista": {
+    "id": "photo-1677694682771-f2a1eaa7b8d9",
+    "alt": "layered dessert"
+  },
+  "Beyaz Çikolatalı Brown": {
+    "id": "photo-1621800043295-a73fe2f76e2c",
+    "alt": "white choc brownie"
+  },
+  "Bitki Çayları": {
+    "id": "photo-1561041695-d2fadf9f318c",
+    "alt": "herbal tea"
+  },
+  "Black Eye": {
+    "id": "photo-1579992357154-faf4bde95b3d",
+    "alt": "black coffee"
+  },
+  "Börek / Poğaça": {
+    "id": "photo-1658661521751-37eba144310a",
+    "alt": "borek"
+  },
+  "Cappuccino": {
+    "id": "photo-1534234757579-8ad69d218ad4",
+    "alt": "cappuccino teacup"
+  },
+  "Caramel Latte": {
+    "id": "photo-1578314675249-a6910f80cc4e",
+    "alt": "caramel latte"
+  },
+  "Chai Tea Latte": {
+    "id": "photo-1578899952107-9c390f1af1b7",
+    "alt": "clear glass cup on brown slab"
+  },
+  "Cheesecake Lotus / Meyveli": {
+    "id": "photo-1638519651608-412009302a02",
+    "alt": "cheesecake"
+  },
+  "Churchill": {
+    "id": "photo-1646257861487-60fa89bef25f",
+    "alt": "lime soda"
+  },
+  "Coco Nut's": {
+    "id": "photo-1553909489-cd47e0907980",
+    "alt": "coconut latte"
+  },
+  "Cookies": {
+    "id": "photo-1498654364264-5e856b6bb047",
+    "alt": "cookies"
+  },
+  "Cool Lime / Berry": {
+    "id": "photo-1728466708408-3957e54cf3de",
+    "alt": "berry drink"
+  },
+  "Cortado": {
+    "id": "photo-1610889556528-9a770e32642f",
+    "alt": "cortado"
+  },
+  "Demleme Çay": {
+    "id": "photo-1603199939607-5bd820dae3eb",
+    "alt": "hot tea"
+  },
+  "Double Espresso": {
+    "id": "photo-1553292218-4892c2e7e1ae",
+    "alt": "double espresso"
+  },
+  "Espresso": {
+    "id": "photo-1510591509098-f4fdc6d0ff04",
+    "alt": "espresso cup"
+  },
+  "Espresso Shot": {
+    "id": "photo-1572286258217-40142c1c6a70",
+    "alt": "espresso shot"
+  },
+  "Filter": {
+    "id": "photo-1497935586351-b67a49e012bf",
+    "alt": "pour over"
+  },
+  "Flat White": {
+    "id": "photo-1512568400610-62da28bc8a13",
+    "alt": "flat white latte art"
+  },
+  "Frappe": {
+    "id": "photo-1574782256243-69c18023f7b4",
+    "alt": "frappe"
+  },
+  "Frozen": {
+    "id": "photo-1461023058943-07fcbe16d735",
+    "alt": "frozen drink"
+  },
+  "Gazoz": {
+    "id": "photo-1625708458528-802ec79b1ed8",
+    "alt": "soda"
+  },
+  "Havuçlu Tarçınlı Kek": {
+    "id": "photo-1579888071069-c107a6f79d82",
+    "alt": "carrot cake"
+  },
+  "Hindi Jambonlu Peynirli Baget": {
+    "id": "photo-1566804770468-867f6158bda5",
+    "alt": "ham baguette"
+  },
+  "Honey": {
+    "id": "photo-1587393855524-087f83d95bc9",
+    "alt": "honey"
+  },
+  "Irish Latte": {
+    "id": "photo-1598908314732-07113901949e",
+    "alt": "irish coffee latte"
+  },
+  "Karamelize Soğanlı Tavuk Sandviç": {
+    "id": "photo-1703219342329-fce8488cf443",
+    "alt": "chicken sandwich"
+  },
+  "Latte": {
+    "id": "photo-1559001724-fbad036dbc9e",
+    "alt": "cafe latte"
+  },
+  "Macchiato": {
+    "id": "photo-1485808191679-5f86510681a2",
+    "alt": "macchiato"
+  },
+  "Marlenka Ballı Cevizli": {
+    "id": "photo-1607914770021-82956c49ec03",
+    "alt": "honey walnut cake"
+  },
+  "Meyveli Soda": {
+    "id": "photo-1616118132534-381148898bb4",
+    "alt": "fruit soda"
+  },
+  "Miel": {
+    "id": "photo-1560155069-ad79768f2666",
+    "alt": "honey latte"
+  },
+  "Mocha": {
+    "id": "photo-1583165278997-0250ea5d72e2",
+    "alt": "mocha"
+  },
+  "Mocha Nut's": {
+    "id": "photo-1517701550927-30cf4ba1dba5",
+    "alt": "hazelnut mocha"
+  },
+  "Mozarelle Sandviç": {
+    "id": "photo-1614800443187-cc573044fa19",
+    "alt": "mozzarella sandwich"
+  },
+  "Nutella Pie": {
+    "id": "photo-1584695278906-c3e1c250bf0d",
+    "alt": "nutella"
+  },
+  "Protein Bar": {
+    "id": "photo-1591271300850-22d6784e0a7f",
+    "alt": "protein bar"
+  },
+  "Pumpkin Spice Latte": {
+    "id": "photo-1592663527359-cf6642f54cff",
+    "alt": "pumpkin spice"
+  },
+  "Sade Soda": {
+    "id": "photo-1602143407151-7111542de6e8",
+    "alt": "sparkling water"
+  },
+  "Salep": {
+    "id": "photo-1661685249316-a06e692e1cb2",
+    "alt": "salep"
+  },
+  "Salted Caramel Latte": {
+    "id": "photo-1586277419671-f34cf56500a0",
+    "alt": "salted caramel"
+  },
+  "Strawberry Latte": {
+    "id": "photo-1703957898966-242db2503775",
+    "alt": "strawberry latte"
+  },
+  "Su": {
+    "id": "photo-1633040243823-6bf8d4edb0ec",
+    "alt": "water bottle"
+  },
+  "Süt": {
+    "id": "photo-1568966299181-bb7282cc84f0",
+    "alt": "milk pitcher"
+  },
+  "Sıcak Çikolata": {
+    "id": "photo-1517578239113-b03992dcdd25",
+    "alt": "hot chocolate mug"
+  },
+  "Türk Kahvesi": {
+    "id": "photo-1576685880864-50b3b35f1c55",
+    "alt": "turkish coffee"
+  },
+  "Vanilla Latte": {
+    "id": "photo-1596952954288-16862d37405b",
+    "alt": "latte"
+  },
+  "Vişneli Brown": {
+    "id": "photo-1602526638273-1c16532650ee",
+    "alt": "cherry brownie"
+  },
+  "White Mocha": {
+    "id": "photo-1631679263367-9095fca628de",
+    "alt": "white mocha"
+  },
+  "Şurup": {
+    "id": "photo-1517701604599-bb29b565090c",
+    "alt": "syrup"
+  }
+}

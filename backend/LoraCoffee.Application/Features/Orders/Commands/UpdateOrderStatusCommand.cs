@@ -1,7 +1,6 @@
-using LoraCoffee.Application.Common;
 using LoraCoffee.Application.DTOs;
-using LoraCoffee.Application.Mappings;
 using LoraCoffee.Application.Interfaces;
+using LoraCoffee.Application.Mappings;
 using LoraCoffee.Domain.Enums;
 using MediatR;
 
@@ -11,14 +10,14 @@ public record UpdateOrderStatusCommand(Guid OrderId, string Status, Guid? UserId
 
 public class UpdateOrderStatusCommandHandler : IRequestHandler<UpdateOrderStatusCommand, ApiResponse<OrderDto>>
 {
-    private readonly IOrderRepository _orderRepository;
+    private readonly IOrderStatusService _orderStatusService;
     private readonly IOrderHubService _orderHubService;
 
     public UpdateOrderStatusCommandHandler(
-        IOrderRepository orderRepository,
+        IOrderStatusService orderStatusService,
         IOrderHubService orderHubService)
     {
-        _orderRepository = orderRepository;
+        _orderStatusService = orderStatusService;
         _orderHubService = orderHubService;
     }
 
@@ -27,24 +26,14 @@ public class UpdateOrderStatusCommandHandler : IRequestHandler<UpdateOrderStatus
         if (!Enum.TryParse<OrderStatus>(command.Status, true, out var newStatus))
             return new ApiResponse<OrderDto>(false, null, "Geçersiz sipariş durumu.");
 
-        var existingOrder = await _orderRepository.GetByIdAsync(command.OrderId, cancellationToken);
-        if (existingOrder is null)
-            return new ApiResponse<OrderDto>(false, null, "Sipariş bulunamadı.");
+        var (order, error) = await _orderStatusService.UpdateStatusAsync(
+            command.OrderId, newStatus, command.UserId, cancellationToken);
 
-        if (!OrderStatusRules.CanTransition(existingOrder.Status, newStatus))
-            return new ApiResponse<OrderDto>(false, null, $"Sipariş durumu {existingOrder.Status} → {newStatus} geçişi geçerli değil.");
+        if (order is null)
+            return new ApiResponse<OrderDto>(false, null, error);
 
-        var updatedOrder = await _orderRepository.UpdateStatusAsync(
-            command.OrderId,
-            newStatus,
-            command.UserId,
-            cancellationToken);
+        await _orderHubService.NotifyOrderStatusChanged(order);
 
-        if (updatedOrder is null)
-            return new ApiResponse<OrderDto>(false, null, "Sipariş bulunamadı.");
-
-        await _orderHubService.NotifyOrderStatusChanged(updatedOrder);
-
-        return new ApiResponse<OrderDto>(true, OrderMapper.ToDto(updatedOrder));
+        return new ApiResponse<OrderDto>(true, OrderMapper.ToDto(order));
     }
 }

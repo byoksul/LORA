@@ -117,6 +117,13 @@ namespace LoraCoffee.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("DiscountType")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("IsSynced")
                         .HasColumnType("boolean");
 
@@ -131,6 +138,10 @@ namespace LoraCoffee.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
+
+                    b.Property<decimal>("SubtotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(18, 2)
@@ -164,6 +175,9 @@ namespace LoraCoffee.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("MilkType")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid");
 
@@ -176,6 +190,9 @@ namespace LoraCoffee.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
+
+                    b.Property<string>("SizeLabel")
+                        .HasColumnType("text");
 
                     b.Property<decimal>("TotalPrice")
                         .HasPrecision(18, 2)
@@ -307,6 +324,13 @@ namespace LoraCoffee.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<decimal?>("PriceLarge")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool>("SupportsMilkChoice")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("TrackStock")
                         .HasColumnType("boolean");
 
@@ -321,6 +345,135 @@ namespace LoraCoffee.Infrastructure.Persistence.Migrations
                     b.HasIndex("CategoryId");
 
                     b.ToTable("Products");
+                });
+
+            modelBuilder.Entity("LoraCoffee.Domain.Entities.ProductRecipe", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("ProductRecipes");
+                });
+
+            modelBuilder.Entity("LoraCoffee.Domain.Entities.ProductRecipeItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsOptional")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ProductRecipeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("StockItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductRecipeId");
+
+                    b.HasIndex("StockItemId");
+
+                    b.ToTable("ProductRecipeItems");
+                });
+
+            modelBuilder.Entity("LoraCoffee.Domain.Entities.PurchaseReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("InvoiceNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("StockMovementId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SupplierName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<decimal>("TotalCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StockMovementId")
+                        .IsUnique();
+
+                    b.ToTable("PurchaseReceipts");
                 });
 
             modelBuilder.Entity("LoraCoffee.Domain.Entities.Role", b =>
@@ -448,12 +601,26 @@ namespace LoraCoffee.Infrastructure.Persistence.Migrations
                     b.Property<int>("MovementType")
                         .HasColumnType("integer");
 
+                    b.Property<decimal>("NewQuantity")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<string>("Notes")
                         .HasColumnType("text");
+
+                    b.Property<decimal>("PreviousQuantity")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal>("Quantity")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("ReferenceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("ReferenceType")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("StockItemId")
                         .HasColumnType("uuid");
@@ -467,6 +634,8 @@ namespace LoraCoffee.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("StockItemId");
+
+                    b.HasIndex("ReferenceType", "ReferenceId");
 
                     b.ToTable("StockMovements");
                 });
@@ -638,6 +807,47 @@ namespace LoraCoffee.Infrastructure.Persistence.Migrations
                     b.Navigation("Category");
                 });
 
+            modelBuilder.Entity("LoraCoffee.Domain.Entities.ProductRecipe", b =>
+                {
+                    b.HasOne("LoraCoffee.Domain.Entities.Product", "Product")
+                        .WithMany("Recipes")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("LoraCoffee.Domain.Entities.ProductRecipeItem", b =>
+                {
+                    b.HasOne("LoraCoffee.Domain.Entities.ProductRecipe", "ProductRecipe")
+                        .WithMany("Items")
+                        .HasForeignKey("ProductRecipeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LoraCoffee.Domain.Entities.StockItem", "StockItem")
+                        .WithMany()
+                        .HasForeignKey("StockItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProductRecipe");
+
+                    b.Navigation("StockItem");
+                });
+
+            modelBuilder.Entity("LoraCoffee.Domain.Entities.PurchaseReceipt", b =>
+                {
+                    b.HasOne("LoraCoffee.Domain.Entities.StockMovement", "StockMovement")
+                        .WithOne("PurchaseReceipt")
+                        .HasForeignKey("LoraCoffee.Domain.Entities.PurchaseReceipt", "StockMovementId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("StockMovement");
+                });
+
             modelBuilder.Entity("LoraCoffee.Domain.Entities.StockMovement", b =>
                 {
                     b.HasOne("LoraCoffee.Domain.Entities.StockItem", "StockItem")
@@ -677,11 +887,23 @@ namespace LoraCoffee.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("LoraCoffee.Domain.Entities.Product", b =>
                 {
                     b.Navigation("OrderItems");
+
+                    b.Navigation("Recipes");
+                });
+
+            modelBuilder.Entity("LoraCoffee.Domain.Entities.ProductRecipe", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("LoraCoffee.Domain.Entities.StockItem", b =>
                 {
                     b.Navigation("Movements");
+                });
+
+            modelBuilder.Entity("LoraCoffee.Domain.Entities.StockMovement", b =>
+                {
+                    b.Navigation("PurchaseReceipt");
                 });
 
             modelBuilder.Entity("LoraCoffee.Domain.Entities.User", b =>

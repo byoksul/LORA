@@ -42,6 +42,27 @@ public interface IStockItemRepository : IRepository<StockItem>
     Task<IReadOnlyList<StockItem>> GetCriticalStockAsync(CancellationToken cancellationToken = default);
 }
 
+public interface IStockMovementRepository : IRepository<StockMovement>
+{
+    Task<IReadOnlyList<StockMovement>> GetFilteredAsync(
+        Guid? stockItemId,
+        StockMovementType? movementType,
+        StockReferenceType? referenceType,
+        Guid? createdBy,
+        DateTime? startDate,
+        DateTime? endDate,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> HasCancelReturnForOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
+}
+
+public interface IProductRecipeRepository : IRepository<ProductRecipe>
+{
+    Task<ProductRecipe?> GetActiveByProductIdAsync(Guid productId, CancellationToken cancellationToken = default);
+    Task<ProductRecipe?> GetByProductIdWithItemsAsync(Guid productId, CancellationToken cancellationToken = default);
+    Task<Dictionary<Guid, bool>> GetHasActiveRecipeMapAsync(CancellationToken cancellationToken = default);
+}
+
 public interface IUnitOfWork
 {
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

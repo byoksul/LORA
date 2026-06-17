@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil } from 'lucide-react'
+import { Plus, Pencil, ChefHat } from 'lucide-react'
+import { ProductRecipePanel } from '@/components/ProductRecipePanel'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -37,6 +38,7 @@ export function ProductsPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [productForm, setProductForm] = useState<ProductForm>(emptyProductForm())
+  const [recipeProduct, setRecipeProduct] = useState<Product | null>(null)
 
   const { data: products } = useQuery({
     queryKey: ['adminProducts'],
@@ -282,12 +284,24 @@ export function ProductsPage() {
                   <Badge variant={product.isActive ? 'success' : 'danger'}>
                     {product.isActive ? 'Aktif' : 'Pasif'}
                   </Badge>
+                  {product.trackStock && (
+                    <Badge variant={product.hasActiveRecipe ? 'success' : 'warning'}>
+                      {product.hasActiveRecipe ? 'Reçete tanımlı' : 'Reçete tanımsız'}
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-sm text-muted">{product.categoryName} · {formatCurrency(product.price)}</p>
                 {product.imageUrl && (
                   <p className="text-xs text-muted/70 truncate mt-0.5">{product.imageUrl}</p>
                 )}
               </div>
+              <button
+                onClick={() => setRecipeProduct(product)}
+                className="p-2 rounded-lg hover:bg-card-hover transition-colors cursor-pointer text-muted hover:text-primary"
+                title="Reçete"
+              >
+                <ChefHat className="w-4 h-4" />
+              </button>
               <button
                 onClick={() => { setEditingProduct(product); setShowForm(true); setTab('products') }}
                 className="p-2 rounded-lg hover:bg-card-hover transition-colors cursor-pointer text-muted hover:text-text"
@@ -319,6 +333,9 @@ export function ProductsPage() {
             </Card>
           ))}
         </div>
+      )}
+      {recipeProduct && (
+        <ProductRecipePanel product={recipeProduct} onClose={() => setRecipeProduct(null)} />
       )}
     </div>
   )

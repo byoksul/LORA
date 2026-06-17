@@ -1,50 +1,148 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, ArrowDown, ArrowUp } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ClipboardList,
+  Flame,
+  History,
+  PackagePlus,
+  TrendingDown,
+} from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { api } from '@/lib/api'
+import { WASTE_REASONS } from '@/types'
+
+type Tab = 'overview' | 'movements' | 'purchase' | 'waste' | 'count'
 
 export function StockPage() {
   const queryClient = useQueryClient()
-  const [selectedItem, setSelectedItem] = useState<string | null>(null)
-  const [movementType, setMovementType] = useState<'In' | 'Out'>('In')
+  const [tab, setTab] = useState<Tab>('overview')
+  const [selectedItem, setSelectedItem] = useState<string>('')
   const [quantity, setQuantity] = useState('')
+  const [notes, setNotes] = useState('')
+  const [wasteReason, setWasteReason] = useState(WASTE_REASONS[0])
+  const [countedQty, setCountedQty] = useState('')
+  const [supplier, setSupplier] = useState('')
+  const [invoiceNo, setInvoiceNo] = useState('')
+  const [unitCost, setUnitCost] = useState('')
+  const [filterItem, setFilterItem] = useState('')
+  const [filterType, setFilterType] = useState('')
+  const [filterStart, setFilterStart] = useState('')
+  const [filterEnd, setFilterEnd] = useState('')
 
   const { data: stockItems } = useQuery({
     queryKey: ['stock'],
     queryFn: async () => (await api.getStockItems()).data || [],
   })
 
-  const criticalItems = stockItems?.filter((s) => s.isCritical) || []
+  const { data: forecasts } = useQuery({
+    queryKey: ['stock-forecast'],
+    queryFn: async () => (await api.getStockForecast()).data || [],
+  })
 
-  const handleMovement = async () => {
-    if (!selectedItem || !quantity) return
-    await api.createStockMovement({
-      stockItemId: selectedItem,
-      movementType,
-      quantity: parseFloat(quantity),
-      notes: undefined,
-    })
+  const { data: movements } = useQuery({
+    queryKey: ['stock-movements', filterItem, filterType, filterStart, filterEnd],
+    queryFn: async () => {
+      const params: Record<string, string> = {}
+      if (filterItem) params.stockItemId = filterItem
+      if (filterType) params.movementType = filterType
+      if (filterStart) params.startDate = filterStart
+      if (filterEnd) params.endDate = filterEnd
+      return (await api.getStockMovements(params)).data || []
+    },
+  })
+
+  const criticalItems = stockItems?.filter((s) => s.isCritical) || []
+  const selectedStock = stockItems?.find((s) => s.id === selectedItem)
+
+  const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['stock'] })
-    setQuantity('')
-    setSelectedItem(null)
+    queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
+    queryClient.invalidateQueries({ queryKey: ['stock-forecast'] })
+    queryClient.invalidateQueries({ queryKey: ['stock-dashboard'] })
   }
+
+  const handlePurchase = async () => {
+    if (!selectedItem || !quantity) return
+    const qty = parseFloat(quantity)
+    const cost = parseFloat(unitCost) || 0
+    await api.stockPurchase(selectedItem, {
+      quantity: qty,
+      unitCost: cost || undefined,
+      totalCost: cost ? cost * qty : undefined,
+      supplierName: supplier || undefined,
+      invoiceNumber: invoiceNo || undefined,
+      notes: notes || undefined,
+    })
+    invalidate()
+    resetForm()
+  }
+
+  const handleWaste = async () => {
+    if (!selectedItem || !quantity) return
+    await api.stockWaste(selectedItem, {
+      quantity: parseFloat(quantity),
+      reason: wasteReason,
+      notes: notes || undefined,
+    })
+    invalidate()
+    resetForm()
+  }
+
+  const handleCount = async () => {
+    if (!selectedItem || !countedQty) return
+    await api.stockAdjustment(selectedItem, {
+      countedQuantity: parseFloat(countedQty),
+      notes: notes || undefined,
+    })
+    invalidate()
+    resetForm()
+  }
+
+  const handleManual = async (type: 'in' | 'out') => {
+    if (!selectedItem || !quantity) return
+    const data = { quantity: parseFloat(quantity), notes: notes || undefined }
+    if (type === 'in') await api.stockManualIn(selectedItem, data)
+    else await api.stockManualOut(selectedItem, data)
+    invalidate()
+    resetForm()
+  }
+
+  const resetForm = () => {
+    setQuantity('')
+    setNotes('')
+    setCountedQty('')
+    setSupplier('')
+    setInvoiceNo('')
+    setUnitCost('')
+    setSelectedItem('')
+  }
+
+  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: 'overview', label: 'Genel', icon: <TrendingDown className="w-4 h-4" /> },
+    { id: 'movements', label: 'Hareketler', icon: <History className="w-4 h-4" /> },
+    { id: 'purchase', label: 'Stok Girişi', icon: <PackagePlus className="w-4 h-4" /> },
+    { id: 'waste', label: 'Fire', icon: <Flame className="w-4 h-4" /> },
+    { id: 'count', label: 'Sayım', icon: <ClipboardList className="w-4 h-4" /> },
+  ]
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Stok Yönetimi</h1>
-        <p className="text-muted text-sm mt-1">Stok giriş/çıkış ve kritik seviye takibi</p>
+        <h1 className="text-2xl font-semibold text-text">Stok Yönetimi</h1>
+        <p className="text-muted text-sm mt-1">Hammadde takibi, reçete entegrasyonu ve hareket geçmişi</p>
       </div>
 
       {criticalItems.length > 0 && (
         <Card className="p-4 border-warning/30 bg-warning/5">
           <div className="flex items-center gap-2 text-warning mb-3">
             <AlertTriangle className="w-5 h-5" />
-            <span className="font-medium">Kritik Stok Uyarıları</span>
+            <span className="font-medium">Kritik Stok Uyarıları ({criticalItems.length})</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {criticalItems.map((item) => (
@@ -56,68 +154,267 @@ export function StockPage() {
         </Card>
       )}
 
-      <Card className="p-6">
-        <h3 className="font-medium mb-4">Stok Hareketi</h3>
-        <div className="grid md:grid-cols-4 gap-4">
-          <select
-            value={selectedItem || ''}
-            onChange={(e) => setSelectedItem(e.target.value)}
-            className="px-4 py-3 rounded-xl bg-background border border-border text-text"
+      <div className="flex flex-wrap gap-2">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium cursor-pointer transition-all ${
+              tab === t.id ? 'bg-primary text-white' : 'bg-card text-muted hover:text-text'
+            }`}
           >
-            <option value="">Stok kalemi seçin</option>
-            {stockItems?.map((item) => (
-              <option key={item.id} value={item.id}>{item.name}</option>
-            ))}
-          </select>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setMovementType('In')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium cursor-pointer transition-all ${
-                movementType === 'In' ? 'bg-success/10 text-success border border-success/30' : 'bg-card border border-border text-muted'
-              }`}
-            >
-              <ArrowDown className="w-4 h-4" /> Giriş
-            </button>
-            <button
-              onClick={() => setMovementType('Out')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium cursor-pointer transition-all ${
-                movementType === 'Out' ? 'bg-danger/10 text-danger border border-danger/30' : 'bg-card border border-border text-muted'
-              }`}
-            >
-              <ArrowUp className="w-4 h-4" /> Çıkış
-            </button>
-          </div>
-          <Input
-            type="number"
-            placeholder="Miktar"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-          />
-          <Button onClick={handleMovement} disabled={!selectedItem || !quantity}>
-            Kaydet
-          </Button>
-        </div>
-      </Card>
-
-      <div className="grid gap-3">
-        {stockItems?.map((item) => (
-          <Card key={item.id} className="p-4 flex items-center gap-4">
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <h3 className="font-medium">{item.name}</h3>
-                {item.isCritical && <Badge variant="warning">Kritik</Badge>}
-              </div>
-              <p className="text-sm text-muted">
-                Kritik seviye: {item.criticalLevel} {item.unit}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold">{item.currentQuantity}</p>
-              <p className="text-xs text-muted">{item.unit}</p>
-            </div>
-          </Card>
+            {t.icon}
+            {t.label}
+          </button>
         ))}
       </div>
+
+      {tab === 'overview' && (
+        <div className="space-y-4">
+          {forecasts && forecasts.filter((f) => f.hasEnoughData && f.remainingDays != null && f.remainingDays <= 5).length > 0 && (
+            <Card className="p-4 border-primary/20 bg-primary/5">
+              <h3 className="font-medium text-text mb-3">Yakında Bitebilecek Stoklar</h3>
+              <div className="space-y-2">
+                {forecasts
+                  .filter((f) => f.hasEnoughData && f.remainingDays != null && f.remainingDays <= 5)
+                  .map((f) => (
+                    <p key={f.stockItemId} className="text-sm text-muted">{f.message}</p>
+                  ))}
+              </div>
+            </Card>
+          )}
+
+          <div className="grid gap-3">
+            {stockItems?.map((item) => {
+              const forecast = forecasts?.find((f) => f.stockItemId === item.id)
+              return (
+                <Card key={item.id} className="p-4 flex items-center gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium text-text">{item.name}</h3>
+                      {item.isCritical && <Badge variant="warning">Kritik</Badge>}
+                    </div>
+                    <p className="text-sm text-muted mt-1">
+                      Kritik seviye: {item.criticalLevel} {item.unit}
+                    </p>
+                    {forecast && (
+                      <p className="text-xs text-muted/80 mt-1">{forecast.message}</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-2xl font-bold ${item.isCritical ? 'text-warning' : 'text-text'}`}>
+                      {item.currentQuantity}
+                    </p>
+                    <p className="text-xs text-muted">{item.unit}</p>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {tab === 'movements' && (
+        <div className="space-y-4">
+          <Card className="p-4">
+            <div className="grid md:grid-cols-4 gap-3">
+              <select
+                value={filterItem}
+                onChange={(e) => setFilterItem(e.target.value)}
+                className="px-3 py-2 rounded-xl bg-background border border-border text-text text-sm"
+              >
+                <option value="">Tüm stok kalemleri</option>
+                {stockItems?.map((i) => (
+                  <option key={i.id} value={i.id}>{i.name}</option>
+                ))}
+              </select>
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="px-3 py-2 rounded-xl bg-background border border-border text-text text-sm"
+              >
+                <option value="">Tüm hareket tipleri</option>
+                <option value="PurchaseIn">Satın Alma</option>
+                <option value="ManualIn">Manuel Giriş</option>
+                <option value="ManualOut">Manuel Çıkış</option>
+                <option value="SaleOut">Satış</option>
+                <option value="WasteOut">Fire</option>
+                <option value="Adjustment">Sayım</option>
+                <option value="CancelReturn">İptal İadesi</option>
+              </select>
+              <Input type="date" value={filterStart} onChange={(e) => setFilterStart(e.target.value)} />
+              <Input type="date" value={filterEnd} onChange={(e) => setFilterEnd(e.target.value)} />
+            </div>
+          </Card>
+
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-muted text-left">
+                    <th className="p-3">Tarih</th>
+                    <th className="p-3">Stok</th>
+                    <th className="p-3">Tip</th>
+                    <th className="p-3">Miktar</th>
+                    <th className="p-3">Önceki</th>
+                    <th className="p-3">Yeni</th>
+                    <th className="p-3">Referans</th>
+                    <th className="p-3">Not</th>
+                    <th className="p-3">Kullanıcı</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {movements?.map((m) => (
+                    <tr key={m.id} className="border-b border-border/50 hover:bg-card-hover">
+                      <td className="p-3 text-muted">
+                        {new Date(m.createdDate).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
+                      </td>
+                      <td className="p-3 text-text">{m.stockItemName}</td>
+                      <td className="p-3">
+                        <Badge variant={m.movementType.includes('Out') || m.movementType === 'WasteOut' ? 'danger' : 'success'}>
+                          {m.movementType}
+                        </Badge>
+                      </td>
+                      <td className="p-3 font-medium">
+                        {m.movementType.includes('Out') || m.movementType === 'WasteOut' ? '-' : '+'}
+                        {m.quantity} {m.unit}
+                      </td>
+                      <td className="p-3 text-muted">{m.previousQuantity}</td>
+                      <td className="p-3">{m.newQuantity}</td>
+                      <td className="p-3 text-muted text-xs">
+                        {m.referenceType ? `${m.referenceType}` : '—'}
+                        {m.notes?.includes('Sipariş') ? ` ${m.notes}` : ''}
+                      </td>
+                      <td className="p-3 text-muted text-xs max-w-[120px] truncate">{m.notes || '—'}</td>
+                      <td className="p-3 text-muted text-xs">{m.createdByName || '—'}</td>
+                    </tr>
+                  ))}
+                  {movements?.length === 0 && (
+                    <tr><td colSpan={9} className="p-8 text-center text-muted">Hareket bulunamadı</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {tab === 'purchase' && (
+        <Card className="p-6 space-y-4">
+          <h3 className="font-medium text-text">Stok Girişi (Satın Alma)</h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            <select
+              value={selectedItem}
+              onChange={(e) => setSelectedItem(e.target.value)}
+              className="px-4 py-3 rounded-xl bg-background border border-border text-text"
+            >
+              <option value="">Stok kalemi seçin</option>
+              {stockItems?.map((i) => (
+                <option key={i.id} value={i.id}>{i.name}</option>
+              ))}
+            </select>
+            <Input type="number" placeholder="Miktar" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+            <Input type="number" step="0.01" placeholder="Birim maliyet (₺)" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
+            <Input placeholder="Tedarikçi adı" value={supplier} onChange={(e) => setSupplier(e.target.value)} />
+            <Input placeholder="Fatura/fiş no" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />
+            <Input placeholder="Not" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+          <Button onClick={handlePurchase} disabled={!selectedItem || !quantity}>Kaydet</Button>
+        </Card>
+      )}
+
+      {tab === 'waste' && (
+        <Card className="p-6 space-y-4">
+          <h3 className="font-medium text-text flex items-center gap-2">
+            <Flame className="w-5 h-5 text-danger" /> Fire Gir
+          </h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            <select
+              value={selectedItem}
+              onChange={(e) => setSelectedItem(e.target.value)}
+              className="px-4 py-3 rounded-xl bg-background border border-border text-text"
+            >
+              <option value="">Stok kalemi seçin</option>
+              {stockItems?.map((i) => (
+                <option key={i.id} value={i.id}>{i.name}</option>
+              ))}
+            </select>
+            <Input type="number" placeholder="Miktar" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+            <select
+              value={wasteReason}
+              onChange={(e) => setWasteReason(e.target.value as typeof wasteReason)}
+              className="px-4 py-3 rounded-xl bg-background border border-border text-text"
+            >
+              {WASTE_REASONS.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+            <Input placeholder="Not" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+          <Button onClick={handleWaste} disabled={!selectedItem || !quantity}>Fire Kaydet</Button>
+        </Card>
+      )}
+
+      {tab === 'count' && (
+        <Card className="p-6 space-y-4">
+          <h3 className="font-medium text-text">Sayım / Düzeltme</h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            <select
+              value={selectedItem}
+              onChange={(e) => setSelectedItem(e.target.value)}
+              className="px-4 py-3 rounded-xl bg-background border border-border text-text"
+            >
+              <option value="">Stok kalemi seçin</option>
+              {stockItems?.map((i) => (
+                <option key={i.id} value={i.id}>{i.name}</option>
+              ))}
+            </select>
+            {selectedStock && (
+              <div className="px-4 py-3 rounded-xl bg-background border border-border text-sm">
+                <span className="text-muted">Sistem miktarı: </span>
+                <span className="font-medium text-text">{selectedStock.currentQuantity} {selectedStock.unit}</span>
+              </div>
+            )}
+            <Input
+              type="number"
+              placeholder="Sayılan miktar"
+              value={countedQty}
+              onChange={(e) => setCountedQty(e.target.value)}
+            />
+            {selectedStock && countedQty && (
+              <div className="px-4 py-3 rounded-xl bg-card border border-border text-sm">
+                <span className="text-muted">Fark: </span>
+                <span className={`font-medium ${parseFloat(countedQty) - selectedStock.currentQuantity < 0 ? 'text-danger' : 'text-success'}`}>
+                  {(parseFloat(countedQty) - selectedStock.currentQuantity).toFixed(2)} {selectedStock.unit}
+                </span>
+              </div>
+            )}
+            <Input placeholder="Not" value={notes} onChange={(e) => setNotes(e.target.value)} className="md:col-span-2" />
+          </div>
+          <Button onClick={handleCount} disabled={!selectedItem || !countedQty}>Sayımı Kaydet</Button>
+
+          <div className="pt-4 border-t border-border">
+            <p className="text-sm text-muted mb-3">Hızlı manuel giriş/çıkış</p>
+            <div className="grid md:grid-cols-3 gap-3">
+              <Input type="number" placeholder="Miktar" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleManual('in')}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium bg-success/10 text-success border border-success/30 cursor-pointer"
+                >
+                  <ArrowDown className="w-4 h-4" /> Giriş
+                </button>
+                <button
+                  onClick={() => handleManual('out')}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium bg-danger/10 text-danger border border-danger/30 cursor-pointer"
+                >
+                  <ArrowUp className="w-4 h-4" /> Çıkış
+                </button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   )
 }

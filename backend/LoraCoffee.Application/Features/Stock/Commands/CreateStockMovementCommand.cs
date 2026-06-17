@@ -1,6 +1,5 @@
 using LoraCoffee.Application.DTOs;
 using LoraCoffee.Application.Interfaces;
-using LoraCoffee.Domain.Entities;
 using LoraCoffee.Domain.Enums;
 using MediatR;
 
@@ -10,17 +9,17 @@ public record CreateStockMovementCommand(CreateStockMovementRequest Request) : I
 
 public class CreateStockMovementCommandHandler : IRequestHandler<CreateStockMovementCommand, ApiResponse<StockMovementDto>>
 {
-    private readonly IRepository<StockItem> _stockRepository;
-    private readonly IRepository<StockMovement> _movementRepository;
+    private readonly IStockService _stockService;
+    private readonly IStockItemRepository _stockRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public CreateStockMovementCommandHandler(
-        IRepository<StockItem> stockRepository,
-        IRepository<StockMovement> movementRepository,
+        IStockService stockService,
+        IStockItemRepository stockRepository,
         IUnitOfWork unitOfWork)
     {
+        _stockService = stockService;
         _stockRepository = stockRepository;
-        _movementRepository = movementRepository;
         _unitOfWork = unitOfWork;
     }
 
@@ -31,32 +30,38 @@ public class CreateStockMovementCommandHandler : IRequestHandler<CreateStockMove
         if (stockItem is null)
             return new ApiResponse<StockMovementDto>(false, null, "Stok kalemi bulunamadı.");
 
-        if (!Enum.TryParse<StockMovementType>(request.MovementType, true, out var movementType))
+        var movementType = MapMovementType(request.MovementType);
+        if (movementType is null)
             return new ApiResponse<StockMovementDto>(false, null, "Geçersiz hareket tipi.");
 
-        if (movementType == StockMovementType.In)
-            stockItem.CurrentQuantity += request.Quantity;
-        else if (movementType == StockMovementType.Out)
-            stockItem.CurrentQuantity -= request.Quantity;
-        else
-            stockItem.CurrentQuantity = request.Quantity;
-
-        stockItem.UpdatedDate = DateTime.UtcNow;
-
-        var movement = new StockMovement
+        try
         {
-            StockItemId = request.StockItemId,
-            MovementType = movementType,
-            Quantity = request.Quantity,
-            Notes = request.Notes
-        };
+            var movement = await _stockService.ApplyMovementAsync(
+                request.StockItemId, movementType.Value, request.Quantity,
+                StockReferenceType.Manual, null, request.Notes, null, null, cancellationToken);
 
-        await _stockRepository.UpdateAsync(stockItem, cancellationToken);
-        await _movementRepository.AddAsync(movement, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return new ApiResponse<StockMovementDto>(true, new StockMovementDto(
-            movement.Id, movement.StockItemId, movement.MovementType.ToString(),
-            movement.Quantity, movement.Notes, movement.CreatedDate));
+            return new ApiResponse<StockMovementDto>(true, StockMovementMapper.ToDto(
+                movement, stockItem.Name, stockItem.Unit, null));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new ApiResponse<StockMovementDto>(false, null, ex.Message);
+        }
+    }
+
+    private static StockMovementType? MapMovementType(string value)
+    {
+        if (Enum.TryParse<StockMovementType>(value, true, out var type))
+            return type;
+
+        if (string.Equals(value, "In", StringComparison.OrdinalIgnoreCase))
+            return StockMovementType.ManualIn;
+
+        if (string.Equals(value, "Out", StringComparison.OrdinalIgnoreCase))
+            return StockMovementType.ManualOut;
+
+        return null;
     }
 }
