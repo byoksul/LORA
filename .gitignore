@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.env.local
+*.user
+bin/
+obj/
+.DS_Store
