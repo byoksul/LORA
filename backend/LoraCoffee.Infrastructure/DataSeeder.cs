@@ -66,14 +66,20 @@ public static class DataSeeder
       .Where(i => legacyStockIds.Contains(i.StockItemId))
       .ToListAsync();
     if (legacyRecipeItems.Count > 0)
+    {
       context.ProductRecipeItems.RemoveRange(legacyRecipeItems);
+      await context.SaveChangesAsync();
+    }
 
     var emptyRecipes = await context.ProductRecipes
       .Include(r => r.Items)
-      .Where(r => r.Items.Count == 0)
+      .Where(r => !r.Items.Any())
       .ToListAsync();
     if (emptyRecipes.Count > 0)
+    {
       context.ProductRecipes.RemoveRange(emptyRecipes);
+      await context.SaveChangesAsync();
+    }
 
     var movementIds = await context.StockMovements
       .Where(m => legacyStockIds.Contains(m.StockItemId))
