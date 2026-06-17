@@ -19,6 +19,7 @@ type ProductForm = {
   categoryId: string
   isActive: boolean
   trackStock: boolean
+  useRecipe: boolean
   stockQuantity: string
 }
 
@@ -30,6 +31,7 @@ const emptyProductForm = (categoryId?: string): ProductForm => ({
   categoryId: categoryId || '',
   isActive: true,
   trackStock: false,
+  useRecipe: false,
   stockQuantity: '0',
 })
 
@@ -62,6 +64,7 @@ export function ProductsPage() {
         categoryId: editingProduct.categoryId,
         isActive: editingProduct.isActive,
         trackStock: editingProduct.trackStock,
+        useRecipe: editingProduct.hasActiveRecipe,
         stockQuantity: String(editingProduct.stockQuantity ?? 0),
       })
     } else if (showForm && tab === 'products') {
@@ -265,12 +268,28 @@ export function ProductsPage() {
                     <input
                       type="checkbox"
                       checked={productForm.trackStock}
-                      onChange={(e) => setProductForm((f) => ({ ...f, trackStock: e.target.checked }))}
+                      onChange={(e) => setProductForm((f) => ({
+                        ...f,
+                        trackStock: e.target.checked,
+                        useRecipe: e.target.checked ? f.useRecipe : false,
+                      }))}
                     />
                     Stok Takibi
                   </label>
+                  <label className="flex items-center gap-2 text-sm text-text">
+                    <input
+                      type="checkbox"
+                      checked={productForm.useRecipe}
+                      onChange={(e) => setProductForm((f) => ({
+                        ...f,
+                        useRecipe: e.target.checked,
+                        trackStock: e.target.checked ? true : f.trackStock,
+                      }))}
+                    />
+                    Hammadde reçetesi (kahve)
+                  </label>
                 </div>
-                {productForm.trackStock && (
+                {productForm.trackStock && !productForm.useRecipe && (
                   <div className="md:col-span-2">
                     <label className="text-sm text-muted mb-1.5 block">Stok adedi</label>
                     <Input
@@ -283,8 +302,14 @@ export function ProductsPage() {
                       required
                     />
                     <p className="text-xs text-muted mt-1.5">
-                      Depodaki mevcut adet. Her satışta 1 düşer; stok bitince POS satışa izin vermez.
+                      Hazır ürünler için (Haşhaşlı, sandviç). Her satışta 1 adet düşer.
                     </p>
+                  </div>
+                )}
+                {productForm.trackStock && productForm.useRecipe && (
+                  <div className="md:col-span-2 px-4 py-3 rounded-xl bg-background border border-border text-sm text-muted">
+                    Kahve gibi hammadde tüketen ürünler: kaydettikten sonra listedeki şef şapkasından reçete tanımlayın.
+                    Stok adedi alanı kullanılmaz; süt, çekirdek vb. Stok Yönetimi&apos;nden takip edilir.
                   </div>
                 )}
               </div>
@@ -348,8 +373,8 @@ export function ProductsPage() {
               </div>
               <button
                 onClick={() => setRecipeProduct(product)}
-                className={`p-2 rounded-lg hover:bg-card-hover transition-colors cursor-pointer text-muted hover:text-primary ${!product.hasActiveRecipe ? 'opacity-40 pointer-events-none' : ''}`}
-                title={product.hasActiveRecipe ? 'Reçete' : 'Hammadde reçetesi yok (doğrudan stok)'}
+                className="p-2 rounded-lg hover:bg-card-hover transition-colors cursor-pointer text-muted hover:text-primary"
+                title="Hammadde reçetesi"
               >
                 <ChefHat className="w-4 h-4" />
               </button>

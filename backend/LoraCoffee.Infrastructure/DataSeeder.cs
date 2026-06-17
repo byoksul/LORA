@@ -60,41 +60,45 @@ public static class DataSeeder
       .Select(s => s.Id)
       .ToListAsync();
 
-    var recipes = await context.ProductRecipes.Include(r => r.Items).ToListAsync();
-    if (recipes.Count > 0)
+    if (legacyStockIds.Count == 0) return;
+
+    var legacyRecipeItems = await context.ProductRecipeItems
+      .Where(i => legacyStockIds.Contains(i.StockItemId))
+      .ToListAsync();
+    if (legacyRecipeItems.Count > 0)
+      context.ProductRecipeItems.RemoveRange(legacyRecipeItems);
+
+    var emptyRecipes = await context.ProductRecipes
+      .Include(r => r.Items)
+      .Where(r => r.Items.Count == 0)
+      .ToListAsync();
+    if (emptyRecipes.Count > 0)
+      context.ProductRecipes.RemoveRange(emptyRecipes);
+
+    var movementIds = await context.StockMovements
+      .Where(m => legacyStockIds.Contains(m.StockItemId))
+      .Select(m => m.Id)
+      .ToListAsync();
+
+    if (movementIds.Count > 0)
     {
-      context.ProductRecipeItems.RemoveRange(recipes.SelectMany(r => r.Items));
-      context.ProductRecipes.RemoveRange(recipes);
+      var receipts = await context.PurchaseReceipts
+        .Where(p => movementIds.Contains(p.StockMovementId))
+        .ToListAsync();
+      context.PurchaseReceipts.RemoveRange(receipts);
     }
 
-    if (legacyStockIds.Count > 0)
-    {
-      var movementIds = await context.StockMovements
-        .Where(m => legacyStockIds.Contains(m.StockItemId))
-        .Select(m => m.Id)
-        .ToListAsync();
+    var movements = await context.StockMovements
+      .Where(m => legacyStockIds.Contains(m.StockItemId))
+      .ToListAsync();
+    context.StockMovements.RemoveRange(movements);
 
-      if (movementIds.Count > 0)
-      {
-        var receipts = await context.PurchaseReceipts
-          .Where(p => movementIds.Contains(p.StockMovementId))
-          .ToListAsync();
-        context.PurchaseReceipts.RemoveRange(receipts);
-      }
+    var items = await context.StockItems
+      .Where(s => legacyStockIds.Contains(s.Id))
+      .ToListAsync();
+    context.StockItems.RemoveRange(items);
 
-      var movements = await context.StockMovements
-        .Where(m => legacyStockIds.Contains(m.StockItemId))
-        .ToListAsync();
-      context.StockMovements.RemoveRange(movements);
-
-      var items = await context.StockItems
-        .Where(s => legacyStockIds.Contains(s.Id))
-        .ToListAsync();
-      context.StockItems.RemoveRange(items);
-    }
-
-    if (recipes.Count > 0 || legacyStockIds.Count > 0)
-      await context.SaveChangesAsync();
+    await context.SaveChangesAsync();
   }
 
   private static async Task SeedInitialUsersAsync(ApplicationDbContext context, IPasswordHasher passwordHasher)
