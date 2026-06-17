@@ -7,7 +7,10 @@ import {
   ClipboardList,
   Flame,
   History,
+  Package,
   PackagePlus,
+  Pencil,
+  Plus,
   TrendingDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -15,9 +18,39 @@ import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { api } from '@/lib/api'
-import { WASTE_REASONS } from '@/types'
+import { STOCK_UNITS, WASTE_REASONS, type StockItem } from '@/types'
 
-type Tab = 'overview' | 'movements' | 'purchase' | 'waste' | 'count'
+type Tab = 'overview' | 'items' | 'movements' | 'purchase' | 'waste' | 'count'
+
+type StockItemForm = {
+  name: string
+  unit: string
+  customUnit: string
+  currentQuantity: string
+  criticalLevel: string
+  isActive: boolean
+}
+
+const emptyStockItemForm = (): StockItemForm => ({
+  name: '',
+  unit: 'adet',
+  customUnit: '',
+  currentQuantity: '0',
+  criticalLevel: '0',
+  isActive: true,
+})
+
+const stockItemToForm = (item: StockItem): StockItemForm => ({
+  name: item.name,
+  unit: STOCK_UNITS.includes(item.unit as (typeof STOCK_UNITS)[number]) ? item.unit : 'custom',
+  customUnit: STOCK_UNITS.includes(item.unit as (typeof STOCK_UNITS)[number]) ? '' : item.unit,
+  currentQuantity: String(item.currentQuantity),
+  criticalLevel: String(item.criticalLevel),
+  isActive: item.isActive,
+})
+
+const resolveUnit = (form: StockItemForm) =>
+  form.unit === 'custom' ? form.customUnit.trim() : form.unit
 
 export function StockPage() {
   const queryClient = useQueryClient()
@@ -34,6 +67,10 @@ export function StockPage() {
   const [filterType, setFilterType] = useState('')
   const [filterStart, setFilterStart] = useState('')
   const [filterEnd, setFilterEnd] = useState('')
+  const [showItemForm, setShowItemForm] = useState(false)
+  const [editingItem, setEditingItem] = useState<StockItem | null>(null)
+  const [itemForm, setItemForm] = useState<StockItemForm>(emptyStockItemForm())
+  const [savingItem, setSavingItem] = useState(false)
 
   const { data: stockItems } = useQuery({
     queryKey: ['stock'],
@@ -123,8 +160,55 @@ export function StockPage() {
     setSelectedItem('')
   }
 
+  const openNewItemForm = () => {
+    setEditingItem(null)
+    setItemForm(emptyStockItemForm())
+    setShowItemForm(true)
+    setTab('items')
+  }
+
+  const openEditItemForm = (item: StockItem) => {
+    setEditingItem(item)
+    setItemForm(stockItemToForm(item))
+    setShowItemForm(true)
+    setTab('items')
+  }
+
+  const handleSaveItem = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const unit = resolveUnit(itemForm)
+    if (!itemForm.name.trim() || !unit) return
+
+    setSavingItem(true)
+    try {
+      if (editingItem) {
+        await api.updateStockItem(editingItem.id, {
+          name: itemForm.name.trim(),
+          unit,
+          criticalLevel: parseFloat(itemForm.criticalLevel) || 0,
+          isActive: itemForm.isActive,
+        })
+      } else {
+        await api.createStockItem({
+          name: itemForm.name.trim(),
+          unit,
+          currentQuantity: parseFloat(itemForm.currentQuantity) || 0,
+          criticalLevel: parseFloat(itemForm.criticalLevel) || 0,
+          isActive: itemForm.isActive,
+        })
+      }
+      invalidate()
+      setShowItemForm(false)
+      setEditingItem(null)
+      setItemForm(emptyStockItemForm())
+    } finally {
+      setSavingItem(false)
+    }
+  }
+
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'overview', label: 'Genel', icon: <TrendingDown className="w-4 h-4" /> },
+    { id: 'items', label: 'Stok Kalemleri', icon: <Package className="w-4 h-4" /> },
     { id: 'movements', label: 'Hareketler', icon: <History className="w-4 h-4" /> },
     { id: 'purchase', label: 'Stok Girişi', icon: <PackagePlus className="w-4 h-4" /> },
     { id: 'waste', label: 'Fire', icon: <Flame className="w-4 h-4" /> },
@@ -133,9 +217,15 @@ export function StockPage() {
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-text">Stok Yönetimi</h1>
-        <p className="text-muted text-sm mt-1">Hammadde takibi, reçete entegrasyonu ve hareket geçmişi</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-text">Stok Yönetimi</h1>
+          <p className="text-muted text-sm mt-1">Hammadde takibi, reçete entegrasyonu ve hareket geçmişi</p>
+        </div>
+        <Button onClick={openNewItemForm}>
+          <Plus className="w-4 h-4" />
+          Yeni Stok Kalemi
+        </Button>
       </div>
 
       {criticalItems.length > 0 && (
@@ -207,9 +297,156 @@ export function StockPage() {
                     </p>
                     <p className="text-xs text-muted">{item.unit}</p>
                   </div>
+                  <button
+                    onClick={() => openEditItemForm(item)}
+                    className="p-2 rounded-lg hover:bg-card-hover transition-colors cursor-pointer text-muted hover:text-text"
+                    title="Düzenle"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
                 </Card>
               )
             })}
+            {stockItems?.length === 0 && (
+              <Card className="p-8 text-center text-muted">
+                <p>Henüz stok kalemi yok.</p>
+                <Button className="mt-4" onClick={openNewItemForm}>
+                  <Plus className="w-4 h-4" />
+                  İlk stok kalemini ekle
+                </Button>
+              </Card>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === 'items' && (
+        <div className="space-y-4">
+          {showItemForm && (
+            <Card className="p-6 space-y-4">
+              <h3 className="font-medium text-text">
+                {editingItem ? 'Stok Kalemini Düzenle' : 'Yeni Stok Kalemi'}
+              </h3>
+              <p className="text-sm text-muted">
+                Sandviç gibi hazır ürünler için birim olarak <strong className="text-text">adet</strong> seçin.
+                Ürün reçetesinde bu kalemi kullanın; satışta otomatik düşer.
+              </p>
+              <form onSubmit={handleSaveItem} className="grid md:grid-cols-2 gap-4">
+                <Input
+                  placeholder="Kalem adı (ör. Mozarelle Sandviç)"
+                  value={itemForm.name}
+                  onChange={(e) => setItemForm((f) => ({ ...f, name: e.target.value }))}
+                  required
+                />
+                <select
+                  value={itemForm.unit}
+                  onChange={(e) => setItemForm((f) => ({ ...f, unit: e.target.value }))}
+                  className="px-4 py-3 rounded-xl bg-background border border-border text-text"
+                >
+                  {STOCK_UNITS.map((u) => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                  <option value="custom">Diğer…</option>
+                </select>
+                {itemForm.unit === 'custom' && (
+                  <Input
+                    placeholder="Özel birim (ör. paket)"
+                    value={itemForm.customUnit}
+                    onChange={(e) => setItemForm((f) => ({ ...f, customUnit: e.target.value }))}
+                    required
+                  />
+                )}
+                {!editingItem ? (
+                  <Input
+                    type="number"
+                    step="0.001"
+                    placeholder="Başlangıç miktarı"
+                    value={itemForm.currentQuantity}
+                    onChange={(e) => setItemForm((f) => ({ ...f, currentQuantity: e.target.value }))}
+                  />
+                ) : (
+                  <div className="px-4 py-3 rounded-xl bg-background border border-border text-sm">
+                    <span className="text-muted">Mevcut miktar: </span>
+                    <span className="font-medium text-text">
+                      {editingItem.currentQuantity} {editingItem.unit}
+                    </span>
+                    <span className="text-muted text-xs block mt-1">
+                      Miktar değişikliği için Stok Girişi veya Sayım sekmesini kullanın.
+                    </span>
+                  </div>
+                )}
+                <Input
+                  type="number"
+                  step="0.001"
+                  placeholder="Kritik seviye (uyarı eşiği)"
+                  value={itemForm.criticalLevel}
+                  onChange={(e) => setItemForm((f) => ({ ...f, criticalLevel: e.target.value }))}
+                />
+                <label className="flex items-center gap-2 text-sm text-text md:col-span-2">
+                  <input
+                    type="checkbox"
+                    checked={itemForm.isActive}
+                    onChange={(e) => setItemForm((f) => ({ ...f, isActive: e.target.checked }))}
+                  />
+                  Aktif
+                </label>
+                <div className="md:col-span-2 flex gap-2">
+                  <Button type="submit" disabled={savingItem || !itemForm.name.trim() || !resolveUnit(itemForm)}>
+                    Kaydet
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setShowItemForm(false)
+                      setEditingItem(null)
+                      setItemForm(emptyStockItemForm())
+                    }}
+                  >
+                    İptal
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          )}
+
+          <div className="grid gap-3">
+            {stockItems?.map((item) => (
+              <Card key={item.id} className="p-4 flex items-center gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-medium text-text">{item.name}</h3>
+                    {!item.isActive && <Badge variant="danger">Pasif</Badge>}
+                    {item.isCritical && <Badge variant="warning">Kritik</Badge>}
+                  </div>
+                  <p className="text-sm text-muted mt-1">
+                    Birim: {item.unit} · Kritik seviye: {item.criticalLevel} {item.unit}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className={`text-xl font-bold ${item.isCritical ? 'text-warning' : 'text-text'}`}>
+                    {item.currentQuantity}
+                  </p>
+                  <p className="text-xs text-muted">{item.unit}</p>
+                </div>
+                <button
+                  onClick={() => openEditItemForm(item)}
+                  className="p-2 rounded-lg hover:bg-card-hover transition-colors cursor-pointer text-muted hover:text-text"
+                  title="Düzenle"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              </Card>
+            ))}
+            {!showItemForm && stockItems?.length === 0 && (
+              <Card className="p-8 text-center text-muted">
+                <p>Henüz stok kalemi yok.</p>
+                <Button className="mt-4" onClick={openNewItemForm}>
+                  <Plus className="w-4 h-4" />
+                  İlk stok kalemini ekle
+                </Button>
+              </Card>
+            )}
           </div>
         </div>
       )}

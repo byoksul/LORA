@@ -80,6 +80,23 @@ export interface StockItem {
   isCritical: boolean
 }
 
+export interface CreateStockItemRequest {
+  name: string
+  unit: string
+  currentQuantity: number
+  criticalLevel: number
+  isActive: boolean
+}
+
+export interface UpdateStockItemRequest {
+  name: string
+  unit: string
+  criticalLevel: number
+  isActive: boolean
+}
+
+export const STOCK_UNITS = ['adet', 'kg', 'lt', 'gr', 'ml'] as const
+
 export interface StockMovement {
   id: string
   stockItemId: string

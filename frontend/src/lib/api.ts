@@ -99,9 +99,9 @@ export const api = {
   getStockAlerts: () => request<import('@/types').StockAlert[]>('/api/stock/alerts'),
   getStockForecast: () => request<import('@/types').StockForecast[]>('/api/stock/forecast'),
   getStockDashboard: () => request<import('@/types').StockDashboard>('/api/stock/dashboard'),
-  createStockItem: (data: unknown) =>
+  createStockItem: (data: import('@/types').CreateStockItemRequest) =>
     request<import('@/types').StockItem>('/api/stock-items', { method: 'POST', body: JSON.stringify(data) }),
-  updateStockItem: (id: string, data: unknown) =>
+  updateStockItem: (id: string, data: import('@/types').UpdateStockItemRequest) =>
     request<import('@/types').StockItem>(`/api/stock-items/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   stockManualIn: (id: string, data: unknown) =>
     request<import('@/types').StockMovement>(`/api/stock-items/${id}/manual-in`, { method: 'POST', body: JSON.stringify(data) }),
