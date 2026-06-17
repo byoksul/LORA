@@ -20,6 +20,8 @@ export function BarPage() {
     refetchInterval: 30000,
   })
 
+  
+
   const queue = orders
     .filter((o) => o.status === 'Pending' || o.status === 'Preparing')
     .sort((a, b) => new Date(a.createdDate).getTime() - new Date(b.createdDate).getTime())
