@@ -1,0 +1,18 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+COPY backend/LoraCoffee.Domain/LoraCoffee.Domain.csproj backend/LoraCoffee.Domain/
+COPY backend/LoraCoffee.Application/LoraCoffee.Application.csproj backend/LoraCoffee.Application/
+COPY backend/LoraCoffee.Infrastructure/LoraCoffee.Infrastructure.csproj backend/LoraCoffee.Infrastructure/
+COPY backend/LoraCoffee.API/LoraCoffee.API.csproj backend/LoraCoffee.API/
+
+RUN dotnet restore backend/LoraCoffee.API/LoraCoffee.API.csproj
+
+COPY backend/ backend/
+RUN dotnet publish backend/LoraCoffee.API/LoraCoffee.API.csproj -c Release -o /app/publish
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/publish .
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "LoraCoffee.API.dll"]

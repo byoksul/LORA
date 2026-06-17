@@ -1,0 +1,52 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lora-postgres
+    environment:
+      POSTGRES_USER: loracoffee
+      POSTGRES_PASSWORD: loracoffee123
+      POSTGRES_DB: loracoffee
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U loracoffee
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: lora-api
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=loracoffee;Username=loracoffee;Password=loracoffee123
+      - Jwt__Key=LoraCoffeeSuperSecretKey2024Minimum32Characters!
+      - Jwt__Issuer=LoraCoffee.API
+      - Jwt__Audience=LoraCoffee.Client
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: lora-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
