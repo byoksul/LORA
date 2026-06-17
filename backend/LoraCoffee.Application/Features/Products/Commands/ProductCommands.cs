@@ -7,6 +7,7 @@ namespace LoraCoffee.Application.Features.Products.Commands;
 
 public record CreateProductCommand(CreateProductRequest Request) : IRequest<ApiResponse<ProductDto>>;
 public record UpdateProductCommand(Guid Id, UpdateProductRequest Request) : IRequest<ApiResponse<ProductDto>>;
+public record DeleteProductCommand(Guid Id) : IRequest<ApiResponse<bool>>;
 
 public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, ApiResponse<ProductDto>>
 {
@@ -75,5 +76,32 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         return new ApiResponse<ProductDto>(true, new ProductDto(
             product.Id, product.Name, product.Description, product.Price, product.PriceLarge, product.SupportsMilkChoice, product.ImageUrl,
             product.IsActive, product.TrackStock, false, product.CategoryId, ""));
+    }
+}
+
+public class DeleteProductCommandHandler : IRequestHandler<DeleteProductCommand, ApiResponse<bool>>
+{
+    private readonly IProductRepository _productRepository;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public DeleteProductCommandHandler(IProductRepository productRepository, IUnitOfWork unitOfWork)
+    {
+        _productRepository = productRepository;
+        _unitOfWork = unitOfWork;
+    }
+
+    public async Task<ApiResponse<bool>> Handle(DeleteProductCommand command, CancellationToken cancellationToken)
+    {
+        var product = await _productRepository.GetByIdAsync(command.Id, cancellationToken);
+        if (product is null)
+            return new ApiResponse<bool>(false, false, "Ürün bulunamadı.");
+
+        if (await _productRepository.HasOrderHistoryAsync(command.Id, cancellationToken))
+            return new ApiResponse<bool>(false, false, "Sipariş geçmişi olan ürün silinemez. Pasife alabilirsiniz.");
+
+        await _productRepository.DeleteWithRecipesAsync(command.Id, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return new ApiResponse<bool>(true, true);
     }
 }

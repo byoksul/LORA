@@ -9,6 +9,7 @@ public record CreateCategoryRequest(string Name, string? Description, string? Im
 public record UpdateCategoryRequest(string Name, string? Description, string? ImageUrl, int SortOrder, bool IsActive);
 public record CreateCategoryCommand(CreateCategoryRequest Request) : IRequest<ApiResponse<CategoryDto>>;
 public record UpdateCategoryCommand(Guid Id, UpdateCategoryRequest Request) : IRequest<ApiResponse<CategoryDto>>;
+public record DeleteCategoryCommand(Guid Id) : IRequest<ApiResponse<bool>>;
 
 public class CreateCategoryCommandHandler : IRequestHandler<CreateCategoryCommand, ApiResponse<CategoryDto>>
 {
@@ -71,5 +72,32 @@ public class UpdateCategoryCommandHandler : IRequestHandler<UpdateCategoryComman
 
         return new ApiResponse<CategoryDto>(true, new CategoryDto(
             category.Id, category.Name, category.Description, category.ImageUrl, category.SortOrder, category.IsActive));
+    }
+}
+
+public class DeleteCategoryCommandHandler : IRequestHandler<DeleteCategoryCommand, ApiResponse<bool>>
+{
+    private readonly ICategoryRepository _categoryRepository;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public DeleteCategoryCommandHandler(ICategoryRepository categoryRepository, IUnitOfWork unitOfWork)
+    {
+        _categoryRepository = categoryRepository;
+        _unitOfWork = unitOfWork;
+    }
+
+    public async Task<ApiResponse<bool>> Handle(DeleteCategoryCommand command, CancellationToken cancellationToken)
+    {
+        var category = await _categoryRepository.GetByIdAsync(command.Id, cancellationToken);
+        if (category is null)
+            return new ApiResponse<bool>(false, false, "Kategori bulunamadı.");
+
+        if (await _categoryRepository.HasProductsAsync(command.Id, cancellationToken))
+            return new ApiResponse<bool>(false, false, "Bu kategoride ürün var. Önce ürünleri silin veya başka kategoriye taşıyın.");
+
+        await _categoryRepository.DeleteAsync(category, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return new ApiResponse<bool>(true, true);
     }
 }

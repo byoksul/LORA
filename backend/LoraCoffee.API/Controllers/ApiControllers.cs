@@ -91,8 +91,8 @@ public class ProductsController : ControllerBase
 
     [HttpGet]
     [AllowAnonymous]
-    public async Task<ActionResult<ApiResponse<List<ProductDto> > >> GetAll([FromQuery] Guid? categoryId)
-        => Ok(await _mediator.Send(new GetProductsQuery(categoryId)));
+    public async Task<ActionResult<ApiResponse<List<ProductDto> > >> GetAll([FromQuery] Guid? categoryId, [FromQuery] bool includeInactive = false)
+        => Ok(await _mediator.Send(new GetProductsQuery(categoryId, includeInactive)));
 
     [HttpPost]
     [Authorize(Roles = "SuperAdmin,Manager")]
@@ -108,6 +108,15 @@ public class ProductsController : ControllerBase
     public async Task<ActionResult<ApiResponse<ProductDto>>> Update(Guid id, [FromBody] UpdateProductRequest request)
     {
         var result = await _mediator.Send(new UpdateProductCommand(id, request));
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "SuperAdmin,Manager")]
+    public async Task<ActionResult<ApiResponse<bool>>> Delete(Guid id)
+    {
+        var result = await _mediator.Send(new DeleteProductCommand(id));
         if (!result.Success) return BadRequest(result);
         return Ok(result);
     }
@@ -159,8 +168,8 @@ public class CategoriesController : ControllerBase
 
     [HttpGet]
     [AllowAnonymous]
-    public async Task<ActionResult<ApiResponse<List<CategoryDto> > >> GetAll()
-        => Ok(await _mediator.Send(new GetCategoriesQuery()));
+    public async Task<ActionResult<ApiResponse<List<CategoryDto> > >> GetAll([FromQuery] bool includeInactive = false)
+        => Ok(await _mediator.Send(new GetCategoriesQuery(includeInactive)));
 
     [HttpPost]
     [Authorize(Roles = "SuperAdmin,Manager")]
@@ -176,6 +185,15 @@ public class CategoriesController : ControllerBase
     public async Task<ActionResult<ApiResponse<CategoryDto>>> Update(Guid id, [FromBody] UpdateCategoryRequest request)
     {
         var result = await _mediator.Send(new UpdateCategoryCommand(id, request));
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "SuperAdmin,Manager")]
+    public async Task<ActionResult<ApiResponse<bool>>> Delete(Guid id)
+    {
+        var result = await _mediator.Send(new DeleteCategoryCommand(id));
         if (!result.Success) return BadRequest(result);
         return Ok(result);
     }

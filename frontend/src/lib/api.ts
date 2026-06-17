@@ -77,9 +77,15 @@ export const api = {
       body: JSON.stringify({ username, password }),
     }),
 
-  getCategories: () => request<import('@/types').Category[]>('/api/categories'),
-  getProducts: (categoryId?: string) =>
-    request<import('@/types').Product[]>(`/api/products${categoryId ? `?categoryId=${categoryId}` : ''}`),
+  getCategories: (includeInactive = false) =>
+    request<import('@/types').Category[]>(`/api/categories${includeInactive ? '?includeInactive=true' : ''}`),
+  getProducts: (categoryId?: string, includeInactive = false) => {
+    const params = new URLSearchParams()
+    if (categoryId) params.set('categoryId', categoryId)
+    if (includeInactive) params.set('includeInactive', 'true')
+    const qs = params.toString()
+    return request<import('@/types').Product[]>(`/api/products${qs ? `?${qs}` : ''}`)
+  },
 
   getActiveOrders: () => request<import('@/types').Order[]>('/api/orders/active'),
   createOrder: (data: unknown) =>
@@ -133,10 +139,14 @@ export const api = {
     request<import('@/types').Product>('/api/products', { method: 'POST', body: JSON.stringify(data) }),
   updateProduct: (id: string, data: unknown) =>
     request<import('@/types').Product>(`/api/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteProduct: (id: string) =>
+    request<boolean>(`/api/products/${id}`, { method: 'DELETE' }),
   createCategory: (data: unknown) =>
     request<import('@/types').Category>('/api/categories', { method: 'POST', body: JSON.stringify(data) }),
   updateCategory: (id: string, data: unknown) =>
     request<import('@/types').Category>(`/api/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteCategory: (id: string) =>
+    request<boolean>(`/api/categories/${id}`, { method: 'DELETE' }),
 
   getSalesReport: (start?: string, end?: string) =>
     request<import('@/types').SalesReport[]>(

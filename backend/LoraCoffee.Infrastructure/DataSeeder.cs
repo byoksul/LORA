@@ -27,174 +27,139 @@ public static class DataSeeder
     var environment = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
 
     await context.Database.MigrateAsync();
-    await SyncMenuAsync(context);
-    await SyncStockAndRecipesAsync(context);
+
+    // Ürünler veritabanından yönetilir; deploy sonrası katalog mevcut veriyi ezmez.
+    if (!await context.Products.AnyAsync())
+    {
+      await SeedInitialMenuFromCatalogAsync(context);
+      await SeedInitialStockAsync(context);
+      await SeedInitialRecipesAsync(context);
+    }
+    else
+    {
+      await EnsureDefaultStockItemsAsync(context);
+    }
+
+    if (!await context.Users.AnyAsync())
+      await SeedInitialUsersAsync(context, passwordHasher);
 
     if (environment.IsDevelopment())
       await EnsureDemoCredentialsAsync(context, passwordHasher);
+  }
 
-    if (await context.Users.AnyAsync()) return;
-
-    var superAdmin = new User
+  private static async Task SeedInitialMenuFromCatalogAsync(ApplicationDbContext context)
+  {
+    foreach (var catalogCategory in MenuCatalog.Categories)
     {
-      Username = "admin",
-      Email = "admin@loracoffee.com",
-      PasswordHash = passwordHasher.Hash("123456"),
-      FirstName = "Super",
-      LastName = "Admin",
-      Role = UserRole.SuperAdmin,
-      IsActive = true
-    };
+      var category = new Category
+      {
+        Name = catalogCategory.Name,
+        SortOrder = catalogCategory.SortOrder,
+        IsActive = true
+      };
+      context.Categories.Add(category);
+      await context.SaveChangesAsync();
 
-    var manager = new User
-    {
-      Username = "manager",
-      Email = "manager@loracoffee.com",
-      PasswordHash = passwordHasher.Hash("222222"),
-      FirstName = "Şube",
-      LastName = "Yöneticisi",
-      Role = UserRole.Manager,
-      IsActive = true
-    };
-
-    var cashier = new User
-    {
-      Username = "kasiyer",
-      Email = "cashier@loracoffee.com",
-      PasswordHash = passwordHasher.Hash("333333"),
-      FirstName = "Kasiyer",
-      LastName = "Demo",
-      Role = UserRole.Cashier,
-      IsActive = true
-    };
-
-    var barista = new User
-    {
-      Username = "barista",
-      Email = "barista@loracoffee.com",
-      PasswordHash = passwordHasher.Hash("444444"),
-      FirstName = "Barista",
-      LastName = "Demo",
-      Role = UserRole.Barista,
-      IsActive = true
-    };
-
-    context.Users.AddRange(superAdmin, manager, cashier, barista);
-
-    var stockItems = new List<StockItem>
-    {
-      new() { Name = "Kahve çekirdeği", Unit = "kg", CurrentQuantity = 15, CriticalLevel = 5 },
-      new() { Name = "Süt", Unit = "lt", CurrentQuantity = 20, CriticalLevel = 10 },
-      new() { Name = "Bardak", Unit = "adet", CurrentQuantity = 500, CriticalLevel = 100 },
-      new() { Name = "Kapak", Unit = "adet", CurrentQuantity = 400, CriticalLevel = 100 },
-      new() { Name = "Buz", Unit = "kg", CurrentQuantity = 50, CriticalLevel = 10 },
-      new() { Name = "Şurup", Unit = "lt", CurrentQuantity = 8, CriticalLevel = 3 },
-      new() { Name = "Kakao", Unit = "kg", CurrentQuantity = 5, CriticalLevel = 2 },
-      new() { Name = "Çikolata sosu", Unit = "lt", CurrentQuantity = 6, CriticalLevel = 2 },
-      new() { Name = "Tatlı", Unit = "adet", CurrentQuantity = 30, CriticalLevel = 10 }
-    };
-    context.StockItems.AddRange(stockItems);
+      foreach (var catalogProduct in catalogCategory.Products)
+      {
+        context.Products.Add(new Product
+        {
+          Name = catalogProduct.Name,
+          Description = catalogProduct.Description,
+          Price = catalogProduct.Price,
+          PriceLarge = catalogProduct.PriceLarge,
+          SupportsMilkChoice = catalogProduct.SupportsMilkChoice,
+          CategoryId = category.Id,
+          ImageUrl = MenuProductImages.Get(catalogProduct.Name),
+          IsActive = true
+        });
+      }
+    }
 
     await context.SaveChangesAsync();
   }
 
-  private static async Task SyncMenuAsync(ApplicationDbContext context)
+  private static async Task SeedInitialUsersAsync(ApplicationDbContext context, IPasswordHasher passwordHasher)
   {
-    var catalogNames = MenuCatalog.AllProductNames();
+    context.Users.AddRange(
+      new User
+      {
+        Username = "admin",
+        Email = "admin@loracoffee.com",
+        PasswordHash = passwordHasher.Hash("123456"),
+        FirstName = "Super",
+        LastName = "Admin",
+        Role = UserRole.SuperAdmin,
+        IsActive = true
+      },
+      new User
+      {
+        Username = "manager",
+        Email = "manager@loracoffee.com",
+        PasswordHash = passwordHasher.Hash("222222"),
+        FirstName = "Şube",
+        LastName = "Yöneticisi",
+        Role = UserRole.Manager,
+        IsActive = true
+      },
+      new User
+      {
+        Username = "kasiyer",
+        Email = "cashier@loracoffee.com",
+        PasswordHash = passwordHasher.Hash("333333"),
+        FirstName = "Kasiyer",
+        LastName = "Demo",
+        Role = UserRole.Cashier,
+        IsActive = true
+      },
+      new User
+      {
+        Username = "barista",
+        Email = "barista@loracoffee.com",
+        PasswordHash = passwordHasher.Hash("444444"),
+        FirstName = "Barista",
+        LastName = "Demo",
+        Role = UserRole.Barista,
+        IsActive = true
+      });
+
+    await context.SaveChangesAsync();
+  }
+
+  private static async Task SeedInitialStockAsync(ApplicationDbContext context)
+  {
+    foreach (var def in DefaultStockDefinitions())
+    {
+      context.StockItems.Add(new StockItem
+      {
+        Name = def.Name,
+        Unit = def.Unit,
+        CurrentQuantity = def.Qty,
+        CriticalLevel = def.Critical,
+        IsActive = true
+      });
+    }
+
+    await context.SaveChangesAsync();
+  }
+
+  private static async Task EnsureDefaultStockItemsAsync(ApplicationDbContext context)
+  {
     var changed = false;
 
-    foreach (var catalogCategory in MenuCatalog.Categories)
+    foreach (var def in DefaultStockDefinitions())
     {
-      var category = await context.Categories
-        .FirstOrDefaultAsync(c => c.Name == catalogCategory.Name);
+      var exists = await context.StockItems.AnyAsync(s => s.Name == def.Name);
+      if (exists) continue;
 
-      if (category is null)
+      context.StockItems.Add(new StockItem
       {
-        category = new Category
-        {
-          Name = catalogCategory.Name,
-          SortOrder = catalogCategory.SortOrder,
-          IsActive = true
-        };
-        context.Categories.Add(category);
-        await context.SaveChangesAsync();
-      }
-      else if (category.SortOrder != catalogCategory.SortOrder || !category.IsActive)
-      {
-        category.SortOrder = catalogCategory.SortOrder;
-        category.IsActive = true;
-        category.UpdatedDate = DateTime.UtcNow;
-        changed = true;
-      }
-
-      foreach (var catalogProduct in catalogCategory.Products)
-      {
-        var product = await context.Products
-          .FirstOrDefaultAsync(p => p.Name == catalogProduct.Name);
-
-        var imageUrl = MenuProductImages.Get(catalogProduct.Name);
-
-        if (product is null)
-        {
-          context.Products.Add(new Product
-          {
-            Name = catalogProduct.Name,
-            Description = catalogProduct.Description,
-            Price = catalogProduct.Price,
-            PriceLarge = catalogProduct.PriceLarge,
-            SupportsMilkChoice = catalogProduct.SupportsMilkChoice,
-            CategoryId = category.Id,
-            ImageUrl = imageUrl,
-            IsActive = true
-          });
-          changed = true;
-          continue;
-        }
-
-        var needsUpdate =
-          product.CategoryId != category.Id ||
-          product.Price != catalogProduct.Price ||
-          product.PriceLarge != catalogProduct.PriceLarge ||
-          product.SupportsMilkChoice != catalogProduct.SupportsMilkChoice ||
-          product.Description != catalogProduct.Description ||
-          product.ImageUrl != imageUrl ||
-          !product.IsActive;
-
-        if (needsUpdate)
-        {
-          product.CategoryId = category.Id;
-          product.Price = catalogProduct.Price;
-          product.PriceLarge = catalogProduct.PriceLarge;
-          product.SupportsMilkChoice = catalogProduct.SupportsMilkChoice;
-          product.Description = catalogProduct.Description;
-          product.ImageUrl = imageUrl;
-          product.IsActive = true;
-          product.UpdatedDate = DateTime.UtcNow;
-          changed = true;
-        }
-      }
-    }
-
-    var allProducts = await context.Products.ToListAsync();
-
-    foreach (var product in allProducts)
-    {
-      if (catalogNames.Contains(product.Name) || !product.IsActive) continue;
-
-      product.IsActive = false;
-      product.UpdatedDate = DateTime.UtcNow;
-      changed = true;
-    }
-
-    var catalogCategoryNames = MenuCatalog.Categories.Select(x => x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
-    var allCategories = await context.Categories.ToListAsync();
-
-    foreach (var category in allCategories)
-    {
-      if (catalogCategoryNames.Contains(category.Name) || !category.IsActive) continue;
-
-      category.IsActive = false;
-      category.UpdatedDate = DateTime.UtcNow;
+        Name = def.Name,
+        Unit = def.Unit,
+        CurrentQuantity = 0,
+        CriticalLevel = def.Critical,
+        IsActive = true
+      });
       changed = true;
     }
 
@@ -202,39 +167,8 @@ public static class DataSeeder
       await context.SaveChangesAsync();
   }
 
-  private static async Task SyncStockAndRecipesAsync(ApplicationDbContext context)
+  private static async Task SeedInitialRecipesAsync(ApplicationDbContext context)
   {
-    var stockDefs = new (string Name, string Unit, decimal Qty, decimal Critical)[]
-    {
-      ("Kahve çekirdeği", "kg", 15, 5),
-      ("Süt", "lt", 20, 10),
-      ("Bardak", "adet", 500, 100),
-      ("Kapak", "adet", 400, 100),
-      ("Buz", "kg", 50, 10),
-      ("Şurup", "lt", 8, 3),
-      ("Kakao", "kg", 5, 2),
-      ("Çikolata sosu", "lt", 6, 2),
-      ("Tatlı", "adet", 30, 10),
-    };
-
-    foreach (var def in stockDefs)
-    {
-      var item = await context.StockItems.FirstOrDefaultAsync(s => s.Name == def.Name);
-      if (item is null)
-      {
-        context.StockItems.Add(new StockItem
-        {
-          Name = def.Name,
-          Unit = def.Unit,
-          CurrentQuantity = def.Qty,
-          CriticalLevel = def.Critical,
-          IsActive = true
-        });
-      }
-    }
-
-    await context.SaveChangesAsync();
-
     var stockMap = await context.StockItems.ToDictionaryAsync(s => s.Name, s => s.Id);
 
     var recipeDefs = new Dictionary<string, (string Name, (string Stock, decimal Qty, string Unit, bool Optional)[] Items)>
@@ -284,41 +218,43 @@ public static class DataSeeder
       if (product is null) continue;
 
       product.TrackStock = true;
-      product.UpdatedDate = DateTime.UtcNow;
 
-      var recipe = await context.ProductRecipes
-        .Include(r => r.Items)
-        .FirstOrDefaultAsync(r => r.ProductId == product.Id);
-
-      if (recipe is null)
+      var recipe = new ProductRecipe
       {
-        recipe = new ProductRecipe
-        {
-          ProductId = product.Id,
-          Name = recipeDef.Name,
-          IsActive = true
-        };
-        context.ProductRecipes.Add(recipe);
-      }
+        ProductId = product.Id,
+        Name = recipeDef.Name,
+        IsActive = true
+      };
+      context.ProductRecipes.Add(recipe);
 
-      if (recipe.Items.Count == 0)
+      foreach (var item in recipeDef.Items)
       {
-        foreach (var item in recipeDef.Items)
+        if (!stockMap.TryGetValue(item.Stock, out var stockId)) continue;
+        recipe.Items.Add(new ProductRecipeItem
         {
-          if (!stockMap.TryGetValue(item.Stock, out var stockId)) continue;
-          recipe.Items.Add(new ProductRecipeItem
-          {
-            StockItemId = stockId,
-            Quantity = item.Qty,
-            Unit = item.Unit,
-            IsOptional = item.Optional
-          });
-        }
+          StockItemId = stockId,
+          Quantity = item.Qty,
+          Unit = item.Unit,
+          IsOptional = item.Optional
+        });
       }
     }
 
     await context.SaveChangesAsync();
   }
+
+  private static (string Name, string Unit, decimal Qty, decimal Critical)[] DefaultStockDefinitions() =>
+  [
+    ("Kahve çekirdeği", "kg", 15, 5),
+    ("Süt", "lt", 20, 10),
+    ("Bardak", "adet", 500, 100),
+    ("Kapak", "adet", 400, 100),
+    ("Buz", "kg", 50, 10),
+    ("Şurup", "lt", 8, 3),
+    ("Kakao", "kg", 5, 2),
+    ("Çikolata sosu", "lt", 6, 2),
+    ("Tatlı", "adet", 30, 10),
+  ];
 
   private static async Task EnsureDemoCredentialsAsync(ApplicationDbContext context, IPasswordHasher passwordHasher)
   {

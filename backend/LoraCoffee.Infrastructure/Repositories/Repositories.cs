@@ -177,6 +177,13 @@ public class ProductRepository : Repository<Product>, IProductRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Product>> GetAllWithCategoryAsync(CancellationToken cancellationToken = default)
+    {
+        return await DbSet
+            .Include(p => p.Category)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Product>> GetByCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default)
     {
         return await DbSet
@@ -184,6 +191,26 @@ public class ProductRepository : Repository<Product>, IProductRepository
             .Where(p => p.IsActive && p.CategoryId == categoryId)
             .OrderBy(p => p.Name)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> HasOrderHistoryAsync(Guid productId, CancellationToken cancellationToken = default)
+    {
+        return await Context.OrderItems.AnyAsync(i => i.ProductId == productId, cancellationToken);
+    }
+
+    public async Task DeleteWithRecipesAsync(Guid productId, CancellationToken cancellationToken = default)
+    {
+        var recipes = await Context.ProductRecipes
+            .Include(r => r.Items)
+            .Where(r => r.ProductId == productId)
+            .ToListAsync(cancellationToken);
+
+        Context.ProductRecipeItems.RemoveRange(recipes.SelectMany(r => r.Items));
+        Context.ProductRecipes.RemoveRange(recipes);
+
+        var product = await DbSet.FindAsync([productId], cancellationToken);
+        if (product is not null)
+            DbSet.Remove(product);
     }
 }
 
@@ -197,6 +224,19 @@ public class CategoryRepository : Repository<Category>, ICategoryRepository
             .Where(c => c.IsActive)
             .OrderBy(c => c.SortOrder)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Category>> GetAllOrderedAsync(CancellationToken cancellationToken = default)
+    {
+        return await DbSet
+            .OrderBy(c => c.SortOrder)
+            .ThenBy(c => c.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> HasProductsAsync(Guid categoryId, CancellationToken cancellationToken = default)
+    {
+        return await Context.Products.AnyAsync(p => p.CategoryId == categoryId, cancellationToken);
     }
 }
 

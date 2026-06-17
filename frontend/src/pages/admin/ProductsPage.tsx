@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, ChefHat } from 'lucide-react'
+import { Plus, Pencil, ChefHat, Trash2 } from 'lucide-react'
 import { ProductRecipePanel } from '@/components/ProductRecipePanel'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -42,12 +42,12 @@ export function ProductsPage() {
 
   const { data: products } = useQuery({
     queryKey: ['adminProducts'],
-    queryFn: async () => (await api.getProducts()).data || [],
+    queryFn: async () => (await api.getProducts(undefined, true)).data || [],
   })
 
   const { data: categories } = useQuery({
-    queryKey: ['categories'],
-    queryFn: async () => (await api.getCategories()).data || [],
+    queryKey: ['categories', 'admin'],
+    queryFn: async () => (await api.getCategories(true)).data || [],
   })
 
   useEffect(() => {
@@ -109,8 +109,32 @@ export function ProductsPage() {
     }
 
     queryClient.invalidateQueries({ queryKey: ['categories'] })
+    queryClient.invalidateQueries({ queryKey: ['categories', 'admin'] })
     setShowForm(false)
     setEditingCategory(null)
+  }
+
+  const handleDeleteProduct = async (product: Product) => {
+    if (!window.confirm(`"${product.name}" ürününü silmek istediğinize emin misiniz?`)) return
+    const res = await api.deleteProduct(product.id)
+    if (!res.success) {
+      window.alert(res.message || 'Ürün silinemedi.')
+      return
+    }
+    queryClient.invalidateQueries({ queryKey: ['adminProducts'] })
+    queryClient.invalidateQueries({ queryKey: ['products'] })
+    queryClient.invalidateQueries({ queryKey: ['menuProducts'] })
+  }
+
+  const handleDeleteCategory = async (category: Category) => {
+    if (!window.confirm(`"${category.name}" kategorisini silmek istediğinize emin misiniz?`)) return
+    const res = await api.deleteCategory(category.id)
+    if (!res.success) {
+      window.alert(res.message || 'Kategori silinemedi.')
+      return
+    }
+    queryClient.invalidateQueries({ queryKey: ['categories'] })
+    queryClient.invalidateQueries({ queryKey: ['categories', 'admin'] })
   }
 
   return (
@@ -118,7 +142,7 @@ export function ProductsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-text">Ürün Yönetimi</h1>
-          <p className="text-muted text-sm mt-1">Kategoriler ve ürünler</p>
+          <p className="text-muted text-sm mt-1">Veritabanındaki ürün ve kategorileri yönetin</p>
         </div>
         <Button
           onClick={() => {
@@ -305,8 +329,16 @@ export function ProductsPage() {
               <button
                 onClick={() => { setEditingProduct(product); setShowForm(true); setTab('products') }}
                 className="p-2 rounded-lg hover:bg-card-hover transition-colors cursor-pointer text-muted hover:text-text"
+                title="Düzenle"
               >
                 <Pencil className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleDeleteProduct(product)}
+                className="p-2 rounded-lg hover:bg-danger/10 transition-colors cursor-pointer text-muted hover:text-danger"
+                title="Sil"
+              >
+                <Trash2 className="w-4 h-4" />
               </button>
             </Card>
           ))}
@@ -327,8 +359,16 @@ export function ProductsPage() {
               <button
                 onClick={() => { setEditingCategory(cat); setShowForm(true); setTab('categories') }}
                 className="p-2 rounded-lg hover:bg-card-hover transition-colors cursor-pointer text-muted hover:text-text"
+                title="Düzenle"
               >
                 <Pencil className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleDeleteCategory(cat)}
+                className="p-2 rounded-lg hover:bg-danger/10 transition-colors cursor-pointer text-muted hover:text-danger"
+                title="Sil"
+              >
+                <Trash2 className="w-4 h-4" />
               </button>
             </Card>
           ))}

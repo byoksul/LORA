@@ -23,12 +23,17 @@ public interface IOrderRepository : IRepository<Order>
 public interface IProductRepository : IRepository<Product>
 {
     Task<IReadOnlyList<Product>> GetActiveProductsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Product>> GetAllWithCategoryAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Product>> GetByCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default);
+    Task<bool> HasOrderHistoryAsync(Guid productId, CancellationToken cancellationToken = default);
+    Task DeleteWithRecipesAsync(Guid productId, CancellationToken cancellationToken = default);
 }
 
 public interface ICategoryRepository : IRepository<Category>
 {
     Task<IReadOnlyList<Category>> GetActiveCategoriesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Category>> GetAllOrderedAsync(CancellationToken cancellationToken = default);
+    Task<bool> HasProductsAsync(Guid categoryId, CancellationToken cancellationToken = default);
 }
 
 public interface IUserRepository : IRepository<User>

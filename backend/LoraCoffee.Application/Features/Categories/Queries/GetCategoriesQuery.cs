@@ -4,7 +4,7 @@ using MediatR;
 
 namespace LoraCoffee.Application.Features.Categories.Queries;
 
-public record GetCategoriesQuery : IRequest<ApiResponse<List<CategoryDto>>>;
+public record GetCategoriesQuery(bool IncludeInactive = false) : IRequest<ApiResponse<List<CategoryDto>>>;
 
 public class GetCategoriesQueryHandler : IRequestHandler<GetCategoriesQuery, ApiResponse<List<CategoryDto>>>
 {
@@ -17,7 +17,9 @@ public class GetCategoriesQueryHandler : IRequestHandler<GetCategoriesQuery, Api
 
     public async Task<ApiResponse<List<CategoryDto>>> Handle(GetCategoriesQuery request, CancellationToken cancellationToken)
     {
-        var categories = await _categoryRepository.GetActiveCategoriesAsync(cancellationToken);
+        var categories = request.IncludeInactive
+            ? await _categoryRepository.GetAllOrderedAsync(cancellationToken)
+            : await _categoryRepository.GetActiveCategoriesAsync(cancellationToken);
         var dtos = categories.Select(c => new CategoryDto(
             c.Id, c.Name, c.Description, c.ImageUrl, c.SortOrder, c.IsActive)).ToList();
         return new ApiResponse<List<CategoryDto>>(true, dtos);
