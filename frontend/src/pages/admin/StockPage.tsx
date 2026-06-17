@@ -220,7 +220,7 @@ export function StockPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-text">Stok Yönetimi</h1>
-          <p className="text-muted text-sm mt-1">Hammadde takibi, reçete entegrasyonu ve hareket geçmişi</p>
+          <p className="text-muted text-sm mt-1">İsteğe bağlı hammadde takibi (un, süt vb.). Hazır ürün stokları Ürün Yönetimi&apos;nden girilir.</p>
         </div>
         <Button onClick={openNewItemForm}>
           <Plus className="w-4 h-4" />

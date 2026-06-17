@@ -19,6 +19,19 @@ public static class DataSeeder
     ["barista@loracoffee.com"] = ("barista", "444444"),
   };
 
+  private static readonly string[] LegacyDemoStockNames =
+  [
+    "Kahve çekirdeği",
+    "Süt",
+    "Bardak",
+    "Kapak",
+    "Buz",
+    "Şurup",
+    "Kakao",
+    "Çikolata sosu",
+    "Tatlı",
+  ];
+
   public static async Task SeedAsync(IServiceProvider serviceProvider)
   {
     using var scope = serviceProvider.CreateScope();
@@ -27,18 +40,7 @@ public static class DataSeeder
     var environment = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
 
     await context.Database.MigrateAsync();
-
-    // Ürünler veritabanından yönetilir; deploy sonrası katalog mevcut veriyi ezmez.
-    if (!await context.Products.AnyAsync())
-    {
-      await SeedInitialMenuFromCatalogAsync(context);
-      await SeedInitialStockAsync(context);
-      await SeedInitialRecipesAsync(context);
-    }
-    else
-    {
-      await EnsureDefaultStockItemsAsync(context);
-    }
+    await CleanupLegacyDemoStockAsync(context);
 
     if (!await context.Users.AnyAsync())
       await SeedInitialUsersAsync(context, passwordHasher);
@@ -47,36 +49,52 @@ public static class DataSeeder
       await EnsureDemoCredentialsAsync(context, passwordHasher);
   }
 
-  private static async Task SeedInitialMenuFromCatalogAsync(ApplicationDbContext context)
+  /// <summary>
+  /// Eski demo stok kalemleri ve hammadde reçetelerini kaldırır.
+  /// Ürün stokları (Product.StockQuantity) ve panelden eklenen özel stok kalemleri korunur.
+  /// </summary>
+  private static async Task CleanupLegacyDemoStockAsync(ApplicationDbContext context)
   {
-    foreach (var catalogCategory in MenuCatalog.Categories)
-    {
-      var category = new Category
-      {
-        Name = catalogCategory.Name,
-        SortOrder = catalogCategory.SortOrder,
-        IsActive = true
-      };
-      context.Categories.Add(category);
-      await context.SaveChangesAsync();
+    var legacyStockIds = await context.StockItems
+      .Where(s => LegacyDemoStockNames.Contains(s.Name))
+      .Select(s => s.Id)
+      .ToListAsync();
 
-      foreach (var catalogProduct in catalogCategory.Products)
-      {
-        context.Products.Add(new Product
-        {
-          Name = catalogProduct.Name,
-          Description = catalogProduct.Description,
-          Price = catalogProduct.Price,
-          PriceLarge = catalogProduct.PriceLarge,
-          SupportsMilkChoice = catalogProduct.SupportsMilkChoice,
-          CategoryId = category.Id,
-          ImageUrl = MenuProductImages.Get(catalogProduct.Name),
-          IsActive = true
-        });
-      }
+    var recipes = await context.ProductRecipes.Include(r => r.Items).ToListAsync();
+    if (recipes.Count > 0)
+    {
+      context.ProductRecipeItems.RemoveRange(recipes.SelectMany(r => r.Items));
+      context.ProductRecipes.RemoveRange(recipes);
     }
 
-    await context.SaveChangesAsync();
+    if (legacyStockIds.Count > 0)
+    {
+      var movementIds = await context.StockMovements
+        .Where(m => legacyStockIds.Contains(m.StockItemId))
+        .Select(m => m.Id)
+        .ToListAsync();
+
+      if (movementIds.Count > 0)
+      {
+        var receipts = await context.PurchaseReceipts
+          .Where(p => movementIds.Contains(p.StockMovementId))
+          .ToListAsync();
+        context.PurchaseReceipts.RemoveRange(receipts);
+      }
+
+      var movements = await context.StockMovements
+        .Where(m => legacyStockIds.Contains(m.StockItemId))
+        .ToListAsync();
+      context.StockMovements.RemoveRange(movements);
+
+      var items = await context.StockItems
+        .Where(s => legacyStockIds.Contains(s.Id))
+        .ToListAsync();
+      context.StockItems.RemoveRange(items);
+    }
+
+    if (recipes.Count > 0 || legacyStockIds.Count > 0)
+      await context.SaveChangesAsync();
   }
 
   private static async Task SeedInitialUsersAsync(ApplicationDbContext context, IPasswordHasher passwordHasher)
@@ -125,136 +143,6 @@ public static class DataSeeder
 
     await context.SaveChangesAsync();
   }
-
-  private static async Task SeedInitialStockAsync(ApplicationDbContext context)
-  {
-    foreach (var def in DefaultStockDefinitions())
-    {
-      context.StockItems.Add(new StockItem
-      {
-        Name = def.Name,
-        Unit = def.Unit,
-        CurrentQuantity = def.Qty,
-        CriticalLevel = def.Critical,
-        IsActive = true
-      });
-    }
-
-    await context.SaveChangesAsync();
-  }
-
-  private static async Task EnsureDefaultStockItemsAsync(ApplicationDbContext context)
-  {
-    var changed = false;
-
-    foreach (var def in DefaultStockDefinitions())
-    {
-      var exists = await context.StockItems.AnyAsync(s => s.Name == def.Name);
-      if (exists) continue;
-
-      context.StockItems.Add(new StockItem
-      {
-        Name = def.Name,
-        Unit = def.Unit,
-        CurrentQuantity = 0,
-        CriticalLevel = def.Critical,
-        IsActive = true
-      });
-      changed = true;
-    }
-
-    if (changed)
-      await context.SaveChangesAsync();
-  }
-
-  private static async Task SeedInitialRecipesAsync(ApplicationDbContext context)
-  {
-    var stockMap = await context.StockItems.ToDictionaryAsync(s => s.Name, s => s.Id);
-
-    var recipeDefs = new Dictionary<string, (string Name, (string Stock, decimal Qty, string Unit, bool Optional)[] Items)>
-    {
-      ["Espresso"] = ("Espresso Reçetesi", [
-        ("Kahve çekirdeği", 0.018m, "kg", false),
-        ("Bardak", 1m, "adet", false),
-        ("Kapak", 1m, "adet", false),
-      ]),
-      ["Americano"] = ("Americano Reçetesi", [
-        ("Kahve çekirdeği", 0.018m, "kg", false),
-        ("Bardak", 1m, "adet", false),
-        ("Kapak", 1m, "adet", false),
-      ]),
-      ["Latte"] = ("Latte Reçetesi", [
-        ("Kahve çekirdeği", 0.018m, "kg", false),
-        ("Süt", 0.200m, "lt", false),
-        ("Bardak", 1m, "adet", false),
-        ("Kapak", 1m, "adet", false),
-      ]),
-      ["Ice Latte"] = ("Ice Latte Reçetesi", [
-        ("Kahve çekirdeği", 0.018m, "kg", false),
-        ("Süt", 0.250m, "lt", false),
-        ("Bardak", 1m, "adet", false),
-        ("Kapak", 1m, "adet", false),
-        ("Buz", 0.150m, "kg", false),
-      ]),
-      ["Cappuccino"] = ("Cappuccino Reçetesi", [
-        ("Kahve çekirdeği", 0.018m, "kg", false),
-        ("Süt", 0.180m, "lt", false),
-        ("Bardak", 1m, "adet", false),
-        ("Kapak", 1m, "adet", false),
-      ]),
-      ["Mocha"] = ("Mocha Reçetesi", [
-        ("Kahve çekirdeği", 0.018m, "kg", false),
-        ("Süt", 0.200m, "lt", false),
-        ("Kakao", 0.010m, "kg", false),
-        ("Çikolata sosu", 0.020m, "lt", false),
-        ("Bardak", 1m, "adet", false),
-        ("Kapak", 1m, "adet", false),
-      ]),
-    };
-
-    foreach (var (productName, recipeDef) in recipeDefs)
-    {
-      var product = await context.Products.FirstOrDefaultAsync(p => p.Name == productName);
-      if (product is null) continue;
-
-      product.TrackStock = true;
-
-      var recipe = new ProductRecipe
-      {
-        ProductId = product.Id,
-        Name = recipeDef.Name,
-        IsActive = true
-      };
-      context.ProductRecipes.Add(recipe);
-
-      foreach (var item in recipeDef.Items)
-      {
-        if (!stockMap.TryGetValue(item.Stock, out var stockId)) continue;
-        recipe.Items.Add(new ProductRecipeItem
-        {
-          StockItemId = stockId,
-          Quantity = item.Qty,
-          Unit = item.Unit,
-          IsOptional = item.Optional
-        });
-      }
-    }
-
-    await context.SaveChangesAsync();
-  }
-
-  private static (string Name, string Unit, decimal Qty, decimal Critical)[] DefaultStockDefinitions() =>
-  [
-    ("Kahve çekirdeği", "kg", 15, 5),
-    ("Süt", "lt", 20, 10),
-    ("Bardak", "adet", 500, 100),
-    ("Kapak", "adet", 400, 100),
-    ("Buz", "kg", 50, 10),
-    ("Şurup", "lt", 8, 3),
-    ("Kakao", "kg", 5, 2),
-    ("Çikolata sosu", "lt", 6, 2),
-    ("Tatlı", "adet", 30, 10),
-  ];
 
   private static async Task EnsureDemoCredentialsAsync(ApplicationDbContext context, IPasswordHasher passwordHasher)
   {

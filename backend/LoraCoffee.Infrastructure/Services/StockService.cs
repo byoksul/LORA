@@ -19,9 +19,21 @@ public class StockService : IStockService
         IEnumerable<(Product Product, int Quantity)> items,
         CancellationToken cancellationToken = default)
     {
-        var requirements = await BuildRequirementsAsync(items, cancellationToken);
-        if (requirements.Count == 0) return null;
+        var itemList = items.ToList();
 
+        foreach (var (product, quantity) in itemList)
+        {
+            if (!product.TrackStock) continue;
+
+            if (await UsesRecipeStockAsync(product.Id, cancellationToken)) continue;
+
+            if (product.StockQuantity < quantity)
+            {
+                return $"{product.Name} için yeterli stok yok. Mevcut: {product.StockQuantity:N0} adet, İstenen: {quantity}.";
+            }
+        }
+
+        var requirements = await BuildRequirementsAsync(itemList, cancellationToken);
         foreach (var req in requirements)
         {
             var stockItem = await _context.StockItems
@@ -45,6 +57,17 @@ public class StockService : IStockService
         var products = await _context.Products
             .Where(p => productIds.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id, cancellationToken);
+
+        foreach (var wrapper in items)
+        {
+            var product = products.GetValueOrDefault(wrapper.Item.ProductId);
+            if (product is null || !product.TrackStock) continue;
+            if (await UsesRecipeStockAsync(product.Id, cancellationToken)) continue;
+
+            product.StockQuantity -= wrapper.Item.Quantity;
+            product.UpdatedDate = DateTime.UtcNow;
+            product.UpdatedBy = userId;
+        }
 
         var orderItems = items.Select(i =>
         {
@@ -97,8 +120,6 @@ public class StockService : IStockService
                         m.ReferenceId == orderId)
             .ToListAsync(cancellationToken);
 
-        if (saleMovements.Count == 0) return true;
-
         foreach (var sale in saleMovements)
         {
             var stockItem = await _context.StockItems
@@ -121,6 +142,28 @@ public class StockService : IStockService
                 Notes = $"Sipariş iptali - #{orderId}",
                 CreatedBy = userId
             });
+        }
+
+        var order = await _context.Orders
+            .Include(o => o.Items)
+            .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
+
+        if (order is not null)
+        {
+            var productIds = order.Items.Select(i => i.ProductId).Distinct().ToList();
+            var products = await _context.Products
+                .Where(p => productIds.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, cancellationToken);
+
+            foreach (var item in order.Items)
+            {
+                if (!products.TryGetValue(item.ProductId, out var product) || !product.TrackStock) continue;
+                if (await UsesRecipeStockAsync(product.Id, cancellationToken)) continue;
+
+                product.StockQuantity += item.Quantity;
+                product.UpdatedDate = DateTime.UtcNow;
+                product.UpdatedBy = userId;
+            }
         }
 
         return true;
@@ -195,6 +238,15 @@ public class StockService : IStockService
         return movement;
     }
 
+    private async Task<bool> UsesRecipeStockAsync(Guid productId, CancellationToken cancellationToken)
+    {
+        var recipe = await _context.ProductRecipes
+            .Include(r => r.Items)
+            .FirstOrDefaultAsync(r => r.ProductId == productId && r.IsActive, cancellationToken);
+
+        return recipe is not null && recipe.Items.Any(i => !i.IsOptional);
+    }
+
     private async Task<List<StockRequirement>> BuildRequirementsAsync(
         IEnumerable<(Product Product, int Quantity)> items,
         CancellationToken cancellationToken)
@@ -204,12 +256,11 @@ public class StockService : IStockService
         foreach (var (product, quantity) in items)
         {
             if (!product.TrackStock) continue;
+            if (!await UsesRecipeStockAsync(product.Id, cancellationToken)) continue;
 
             var recipe = await _context.ProductRecipes
                 .Include(r => r.Items)
-                .FirstOrDefaultAsync(r => r.ProductId == product.Id && r.IsActive, cancellationToken);
-
-            if (recipe is null || recipe.Items.Count == 0) continue;
+                .FirstAsync(r => r.ProductId == product.Id && r.IsActive, cancellationToken);
 
             foreach (var recipeItem in recipe.Items.Where(i => !i.IsOptional))
             {

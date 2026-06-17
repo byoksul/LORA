@@ -28,7 +28,7 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, ApiResp
 
         var dtos = products.Select(p => new ProductDto(
             p.Id, p.Name, p.Description, p.Price, p.PriceLarge, p.SupportsMilkChoice, p.ImageUrl,
-            p.IsActive, p.TrackStock, recipeMap.ContainsKey(p.Id), p.CategoryId, p.Category?.Name ?? "")).ToList();
+            p.IsActive, p.TrackStock, p.StockQuantity, recipeMap.ContainsKey(p.Id), p.CategoryId, p.Category?.Name ?? "")).ToList();
 
         return new ApiResponse<List<ProductDto>>(true, dtos);
     }

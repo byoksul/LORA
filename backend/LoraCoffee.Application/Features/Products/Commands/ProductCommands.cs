@@ -31,6 +31,7 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             ImageUrl = request.ImageUrl,
             IsActive = request.IsActive,
             TrackStock = request.TrackStock,
+            StockQuantity = request.TrackStock ? request.StockQuantity : 0,
             CategoryId = request.CategoryId
         };
 
@@ -39,7 +40,7 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
 
         return new ApiResponse<ProductDto>(true, new ProductDto(
             product.Id, product.Name, product.Description, product.Price, product.PriceLarge, product.SupportsMilkChoice, product.ImageUrl,
-            product.IsActive, product.TrackStock, false, product.CategoryId, ""));
+            product.IsActive, product.TrackStock, product.StockQuantity, false, product.CategoryId, ""));
     }
 }
 
@@ -67,6 +68,7 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         product.ImageUrl = request.ImageUrl;
         product.IsActive = request.IsActive;
         product.TrackStock = request.TrackStock;
+        product.StockQuantity = request.TrackStock ? request.StockQuantity : 0;
         product.CategoryId = request.CategoryId;
         product.UpdatedDate = DateTime.UtcNow;
 
@@ -75,7 +77,7 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
 
         return new ApiResponse<ProductDto>(true, new ProductDto(
             product.Id, product.Name, product.Description, product.Price, product.PriceLarge, product.SupportsMilkChoice, product.ImageUrl,
-            product.IsActive, product.TrackStock, false, product.CategoryId, ""));
+            product.IsActive, product.TrackStock, product.StockQuantity, false, product.CategoryId, ""));
     }
 }
 

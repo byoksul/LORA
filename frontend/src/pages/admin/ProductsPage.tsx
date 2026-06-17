@@ -19,6 +19,7 @@ type ProductForm = {
   categoryId: string
   isActive: boolean
   trackStock: boolean
+  stockQuantity: string
 }
 
 const emptyProductForm = (categoryId?: string): ProductForm => ({
@@ -29,6 +30,7 @@ const emptyProductForm = (categoryId?: string): ProductForm => ({
   categoryId: categoryId || '',
   isActive: true,
   trackStock: false,
+  stockQuantity: '0',
 })
 
 export function ProductsPage() {
@@ -60,6 +62,7 @@ export function ProductsPage() {
         categoryId: editingProduct.categoryId,
         isActive: editingProduct.isActive,
         trackStock: editingProduct.trackStock,
+        stockQuantity: String(editingProduct.stockQuantity ?? 0),
       })
     } else if (showForm && tab === 'products') {
       setProductForm(emptyProductForm(categories?.[0]?.id))
@@ -75,6 +78,7 @@ export function ProductsPage() {
       imageUrl: productForm.imageUrl.trim() || undefined,
       isActive: productForm.isActive,
       trackStock: productForm.trackStock,
+      stockQuantity: productForm.trackStock ? parseFloat(productForm.stockQuantity) || 0 : 0,
       categoryId: productForm.categoryId,
     }
 
@@ -266,6 +270,23 @@ export function ProductsPage() {
                     Stok Takibi
                   </label>
                 </div>
+                {productForm.trackStock && (
+                  <div className="md:col-span-2">
+                    <label className="text-sm text-muted mb-1.5 block">Stok adedi</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={productForm.stockQuantity}
+                      onChange={(e) => setProductForm((f) => ({ ...f, stockQuantity: e.target.value }))}
+                      placeholder="Örn. 10"
+                      required
+                    />
+                    <p className="text-xs text-muted mt-1.5">
+                      Depodaki mevcut adet. Her satışta 1 düşer; stok bitince POS satışa izin vermez.
+                    </p>
+                  </div>
+                )}
               </div>
               <div className="flex gap-2">
                 <Button type="submit">Kaydet</Button>
@@ -309,9 +330,15 @@ export function ProductsPage() {
                     {product.isActive ? 'Aktif' : 'Pasif'}
                   </Badge>
                   {product.trackStock && (
-                    <Badge variant={product.hasActiveRecipe ? 'success' : 'warning'}>
-                      {product.hasActiveRecipe ? 'Reçete tanımlı' : 'Reçete tanımsız'}
-                    </Badge>
+                    product.hasActiveRecipe ? (
+                      <Badge variant={product.hasActiveRecipe ? 'success' : 'warning'}>
+                        Reçete tanımlı
+                      </Badge>
+                    ) : (
+                      <Badge variant={product.stockQuantity <= 2 ? 'warning' : 'success'}>
+                        Stok: {product.stockQuantity} adet
+                      </Badge>
+                    )
                   )}
                 </div>
                 <p className="text-sm text-muted">{product.categoryName} · {formatCurrency(product.price)}</p>
@@ -321,8 +348,8 @@ export function ProductsPage() {
               </div>
               <button
                 onClick={() => setRecipeProduct(product)}
-                className="p-2 rounded-lg hover:bg-card-hover transition-colors cursor-pointer text-muted hover:text-primary"
-                title="Reçete"
+                className={`p-2 rounded-lg hover:bg-card-hover transition-colors cursor-pointer text-muted hover:text-primary ${!product.hasActiveRecipe ? 'opacity-40 pointer-events-none' : ''}`}
+                title={product.hasActiveRecipe ? 'Reçete' : 'Hammadde reçetesi yok (doğrudan stok)'}
               >
                 <ChefHat className="w-4 h-4" />
               </button>

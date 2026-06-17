@@ -5,9 +5,9 @@ public record LoginResponse(string Token, UserDto User);
 public record UserDto(Guid Id, string Email, string FirstName, string LastName, string Role, bool IsActive, DateTime? LastLoginDate);
 
 public record CategoryDto(Guid Id, string Name, string? Description, string? ImageUrl, int SortOrder, bool IsActive);
-public record ProductDto(Guid Id, string Name, string? Description, decimal Price, decimal? PriceLarge, bool SupportsMilkChoice, string? ImageUrl, bool IsActive, bool TrackStock, bool HasActiveRecipe, Guid CategoryId, string CategoryName);
-public record CreateProductRequest(string Name, string? Description, decimal Price, string? ImageUrl, bool IsActive, bool TrackStock, Guid CategoryId);
-public record UpdateProductRequest(string Name, string? Description, decimal Price, string? ImageUrl, bool IsActive, bool TrackStock, Guid CategoryId);
+public record ProductDto(Guid Id, string Name, string? Description, decimal Price, decimal? PriceLarge, bool SupportsMilkChoice, string? ImageUrl, bool IsActive, bool TrackStock, decimal StockQuantity, bool HasActiveRecipe, Guid CategoryId, string CategoryName);
+public record CreateProductRequest(string Name, string? Description, decimal Price, string? ImageUrl, bool IsActive, bool TrackStock, decimal StockQuantity, Guid CategoryId);
+public record UpdateProductRequest(string Name, string? Description, decimal Price, string? ImageUrl, bool IsActive, bool TrackStock, decimal StockQuantity, Guid CategoryId);
 
 public record OrderItemDto(Guid Id, Guid ProductId, string ProductName, string? SizeLabel, string? MilkType, int Quantity, decimal UnitPrice, decimal TotalPrice);
 public record PaymentDto(Guid Id, string PaymentType, decimal Amount);

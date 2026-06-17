@@ -48,6 +48,7 @@ public class ApplicationDbContext : DbContext
             e.Property(p => p.Name).HasMaxLength(200);
             e.Property(p => p.Price).HasPrecision(18, 2);
             e.Property(p => p.PriceLarge).HasPrecision(18, 2);
+            e.Property(p => p.StockQuantity).HasPrecision(18, 2);
             e.HasOne(p => p.Category).WithMany(c => c.Products).HasForeignKey(p => p.CategoryId);
         });
 

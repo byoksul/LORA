@@ -33,6 +33,7 @@ export interface Product {
   imageUrl?: string
   isActive: boolean
   trackStock: boolean
+  stockQuantity: number
   hasActiveRecipe: boolean
   categoryId: string
   categoryName: string
